@@ -1,0 +1,6 @@
+__pycache__/
+.vscode/
+*.pth
+rough*
+utils/
+train.py
