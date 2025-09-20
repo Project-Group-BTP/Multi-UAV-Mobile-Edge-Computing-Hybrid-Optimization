@@ -7,13 +7,13 @@ from typing import List, Optional, Tuple
 
 def _get_computing_latency_and_energy(uav: "UAV", cpu_cycles: int) -> Tuple[float, float]:
     assert uav.current_slot_request_count != 0  # rethink
-    computing_capacity_per_request = uav.computing_capacity / uav.current_slot_request_count
-    return cpu_cycles / computing_capacity_per_request, config.K_CPU * cpu_cycles * (computing_capacity_per_request ** 2)
+    computing_capacity_per_request = config.UAV_COMPUTING_CAPACITY[uav.id] / uav.current_slot_request_count
+    return cpu_cycles / computing_capacity_per_request, config.K_CPU * cpu_cycles * (computing_capacity_per_request**2)
 
 
 def _try_add_file_to_cache(uav: "UAV", file_id: int) -> None:
     used_space = np.sum(uav.cache * config.FILE_SIZES)
-    if used_space + config.FILE_SIZES[file_id] <= uav.storage_capacity:
+    if used_space + config.FILE_SIZES[file_id] <= config.UAV_STORAGE_CAPACITY[uav.id]:
         uav.cache[file_id] = True
 
 
@@ -22,13 +22,9 @@ class UAV:
         self.id: int = uav_id
         self.pos: np.ndarray = np.array([np.random.uniform(0, config.AREA_WIDTH), np.random.uniform(0, config.AREA_HEIGHT), config.UAV_ALTITUDE])
         self.dist_moved: float = 0.0  # Distance moved in the current time slot
-        self.computing_capacity: int = config.UAV_COMPUTING_CAP
-        self.storage_capacity: int = config.UAV_STORAGE_CAP
-        self.coverage_radius: float = config.UAV_COVERAGE_RADIUS
-        self.sensing_range: float = config.UAV_SENSING_RANGE
 
         self.current_covered_ues: List[UE] = []
-        self.current_collaborator: Optional["UAV"] = None  # Rethink optional
+        self.current_collaborator: Optional["UAV"] = None
         self.current_slot_request_count: int = 0
 
         # Energy consumed for this time slot
@@ -50,11 +46,18 @@ class UAV:
         self.dist_moved = float(np.linalg.norm(new_pos - self.pos))
         self.pos = new_pos
 
+    def reset_for_time_slot(self) -> None:
+        self.current_covered_ues = []
+        self.current_collaborator = None
+        self.current_slot_request_count = 0
+        self.current_requested_files = np.zeros(config.NUM_CONTENTS + config.NUM_SERVICES, dtype=bool)
+        self.energy_current_slot = 0.0
+
     def _set_covered_ues(self, ues: List[UE]) -> None:
         """
         Returns a list of UEs covered by this UAV.
         """
-        self.current_covered_ues = [ue for ue in ues if np.linalg.norm(self.pos[:2] - ue.pos[:2]) <= self.coverage_radius]
+        self.current_covered_ues = [ue for ue in ues if np.linalg.norm(self.pos[:2] - ue.pos[:2]) <= config.UAV_COVERAGE_RADIUS]
 
     def set_current_requested_files(self, ues: List[UE]) -> None:
         """
@@ -76,7 +79,7 @@ class UAV:
         for other_uav in all_uavs:
             if other_uav.id != self.id:
                 distance = float(np.linalg.norm(self.pos - other_uav.pos))
-                if distance <= self.sensing_range:
+                if distance <= config.UAV_SENSING_RANGE:
                     neighbors.append(other_uav)
         return neighbors
 
@@ -85,7 +88,7 @@ class UAV:
         Chooses a single collaborating UAV from the list of neighbours.
         """
         if not neighbors:
-            return None  # Rethink what to do for none
+            return
         best_collaborators: List["UAV"] = []
         max_overlap: int = -1
 
@@ -124,6 +127,9 @@ class UAV:
         else:
             self.current_collaborator = closest_collaborators[np.random.randint(0, len(closest_collaborators))]
 
+        # Since collaborator is known, set rates now
+        self._set_rates()
+
     def set_current_slot_request_count(self) -> None:
         for ue in self.current_covered_ues:
             _, _, req_id = ue.current_request
@@ -138,8 +144,6 @@ class UAV:
         Either serves from cache or offloads to collaborators/MBS.
         """
         # Request from Associated UE
-        self.set_rates()
-        self.energy_current_slot = 0.0
         for ue in self.current_covered_ues:
             ue_uav_rate = comms.calculate_ue_uav_rate(comms.calculate_channel_gain(ue.pos, self.pos), len(self.current_covered_ues))
             if ue.current_request[0] == 0:  # Service Request
@@ -148,13 +152,14 @@ class UAV:
                 self.process_content_request(ue, ue_uav_rate)
             ue.update_service_coverage
 
-    def set_rates(self) -> None:
+    def _set_rates(self) -> None:
         self.uav_mbs_rate = comms.calculate_uav_mbs_rate(comms.calculate_channel_gain(self.pos, config.MBS_POS))
         if self.current_collaborator:  # rethink for None
             self.uav_uav_rate = comms.calculate_uav_uav_rate(comms.calculate_channel_gain(self.pos, self.current_collaborator.pos))
 
     def process_service_request(self, ue: UE, ue_uav_rate: float) -> None:
         _, req_size, req_id = ue.current_request
+        assert req_id < config.NUM_SERVICES
         ue_assoc_uav_latency = req_size / ue_uav_rate
         cpu_cycles = config.CPU_CYCLES_PER_BYTE[req_id] * req_size
         if self.cache[req_id]:
@@ -182,6 +187,7 @@ class UAV:
 
     def process_content_request(self, ue: UE, ue_uav_rate: float) -> None:
         _, _, req_id = ue.current_request
+        assert req_id >= config.NUM_SERVICES
         file_size = config.FILE_SIZES[req_id]
         ue_assoc_uav_latency = file_size / ue_uav_rate
         if self.cache[req_id]:
