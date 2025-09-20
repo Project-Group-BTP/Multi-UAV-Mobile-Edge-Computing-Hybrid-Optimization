@@ -1,6 +1,8 @@
 __pycache__/
+.mypy_cache/
 .vscode/
 *.pth
 rough*
 utils/
 train.py
+models/

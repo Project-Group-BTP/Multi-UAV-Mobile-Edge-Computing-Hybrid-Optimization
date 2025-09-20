@@ -5,15 +5,12 @@ import numpy as np
 def calculate_channel_gain(pos1: np.ndarray, pos2: np.ndarray) -> float:
     """Calculates channel gain based on the free-space path loss model."""
     distance_sq = np.sum((pos1 - pos2) ** 2)
-    if distance_sq == 0:
-        return np.inf
-    return (config.G0 * config.g0) / distance_sq
+    return (config.G_0 * config.g_0) / (distance_sq + config.EPSILON)
 
 
 def calculate_ue_uav_rate(channel_gain: float, num_associated_ues: int) -> float:
     """Calculates data rate between a UE and a UAV."""
-    if num_associated_ues == 0:
-        return 0
+    assert(num_associated_ues != 0)
     bandwidth_per_ue = config.BANDWIDTH_EDGE / num_associated_ues
     snr = (config.TRANSMIT_POWER * channel_gain) / config.NOISE_POWER
     return bandwidth_per_ue * np.log2(1 + snr)
