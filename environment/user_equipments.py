@@ -28,6 +28,10 @@ class UE:
         self._successful_requests: int = 0
         self.service_coverage: float = 0.0
 
+    @property
+    def latency(self) -> float:
+        return self.latency_current_request
+
     def update_position(self) -> None:
         """
         Updates the UE's position for one time slot as per the Random Waypoint model.

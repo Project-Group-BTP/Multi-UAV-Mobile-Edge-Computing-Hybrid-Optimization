@@ -38,11 +38,10 @@ class Env:
 
         for uav in self._uavs:
             uav.set_current_requested_files(self._ues)
-            uav_neighbors = uav.get_neighbors(self._uavs)
-            uav.select_collaborator(uav_neighbors)
+            uav.select_collaborator(uav.get_neighbors(self._uavs))
 
         for uav in self._uavs:
-            uav.set_current_service_request_count()
+            uav.set_freq_counts()
 
         for uav in self._uavs:
             uav.process_requests()
@@ -51,4 +50,18 @@ class Env:
             ue.update_service_coverage(self._time_step)
 
         for uav in self._uavs:
+            uav.update_ema_scores()
             uav.update_energy_consumption()
+
+        # MARL model used at this point
+
+        if self._time_step % config.T_CACHE_UPDATE_INTERVAL == 0:
+            for uav in self._uavs:
+                uav.gdsf_cache_update()
+
+        total_latency = sum(ue.latency for ue in self._ues)
+        total_energy = sum(uav.energy for uav in self._uavs)
+        sc_metrics = np.array([ue.service_coverage for ue in self._ues])
+        sum_sc = np.sum(sc_metrics)
+        sum_sq_sc = np.sum(sc_metrics**2)
+        jfi = (sum_sc**2) / (config.NUM_UES * sum_sq_sc) if sum_sq_sc > 0 else 0.0

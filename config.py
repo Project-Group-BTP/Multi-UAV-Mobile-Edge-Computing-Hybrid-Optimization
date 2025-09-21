@@ -28,8 +28,8 @@ POWER_HOVER: float = 100.0  # P_hover in Watts
 NUM_SERVICES: int = 50  # S
 NUM_CONTENTS: int = 100  # K
 NUM_FILES: int = NUM_SERVICES + NUM_CONTENTS  # S + K
-CPU_CYCLES_PER_BYTE: np.ndarray = np.random.randint(500, 1500, size=NUM_SERVICES)  # omega_s_m in bytes
-FILE_SIZES: np.ndarray = np.random.randint(1_000_000, 100_000_000, size=NUM_FILES)  # D_s_m and D_k_min bytes
+CPU_CYCLES_PER_BYTE: np.ndarray = np.random.randint(500, 1500, size=NUM_SERVICES)  # omega_s_m
+FILE_SIZES: np.ndarray = np.random.randint(1_000_000, 100_000_000, size=NUM_FILES)  # 1MB to 100MB
 MIN_INPUT_SIZE: int = 1_000_000  # 1MB
 MAX_INPUT_SIZE: int = 1_000_000_000  # 1GB
 ZIPF_BETA: float = 0.8

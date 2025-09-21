@@ -33,19 +33,26 @@ class UAV:
         self._energy_current_slot: float = 0.0  # Energy consumed for this time slot
 
         # Cache and request tracking
-        self._current_requested_files: np.ndarray = np.zeros(config.NUM_CONTENTS + config.NUM_SERVICES, dtype=bool)
-        self.cache: np.ndarray = np.zeros(config.NUM_CONTENTS + config.NUM_SERVICES, dtype=bool)
+        self._current_requested_files: np.ndarray = np.zeros(config.NUM_FILES, dtype=bool)
+        self.cache: np.ndarray = np.zeros(config.NUM_FILES, dtype=bool)
+        self._freq_counts = np.zeros(config.NUM_FILES)  # For GDSF caching policy
+        self._ema_scores = np.zeros(config.NUM_FILES)
 
         # Communication rates
         self._uav_uav_rate: float = 0.0
         self._uav_mbs_rate: float = 0.0
+    
+    @property
+    def energy(self) -> float:
+        return self._energy_current_slot
 
     def reset_for_time_slot(self) -> None:
         """Reset UAV state for a new time slot."""
         self._current_covered_ues = []
         self._current_collaborator = None
         self._current_service_request_count = 0
-        self._current_requested_files = np.zeros(config.NUM_CONTENTS + config.NUM_SERVICES, dtype=bool)
+        self._current_requested_files = np.zeros(config.NUM_FILES, dtype=bool)
+        self._freq_counts = np.zeros(config.NUM_FILES)
         self._energy_current_slot = 0.0
 
     def update_position(self, next_pos: np.ndarray) -> None:
@@ -64,15 +71,9 @@ class UAV:
                     neighbors.append(other_uav)
         return neighbors
 
-    def _set_covered_ues(self, ues: List[UE]) -> None:
-        """Set the list of UEs covered by this UAV."""
-        self._current_covered_ues = [ue for ue in ues if np.linalg.norm(self.pos[:2] - ue.pos[:2]) <= config.UAV_COVERAGE_RADIUS]
-
     def set_current_requested_files(self, ues: List[UE]) -> None:
         """Update the current requested files based on the UEs covered by this UAV."""
         self._set_covered_ues(ues)
-        self._current_requested_files = np.zeros(config.NUM_CONTENTS + config.NUM_SERVICES, dtype=bool)
-
         for ue in self._current_covered_ues:
             if ue.current_request:
                 _, _, req_id = ue.current_request
@@ -89,7 +90,6 @@ class UAV:
         # Find neighbors with maximum overlap
         for neighbor in neighbors:
             overlap = int(np.sum(self._current_requested_files & neighbor.cache))
-
             if overlap > max_overlap:
                 max_overlap = overlap
                 best_collaborators = [neighbor]
@@ -124,32 +124,37 @@ class UAV:
         # Set communication rates once collaborator is selected
         self._set_rates()
 
-    def _set_rates(self) -> None:
-        """Set communication rates for UAV-MBS and UAV-UAV links."""
-        self._uav_mbs_rate = comms.calculate_uav_mbs_rate(comms.calculate_channel_gain(self.pos, config.MBS_POS))
-        if self._current_collaborator:
-            self._uav_uav_rate = comms.calculate_uav_uav_rate(comms.calculate_channel_gain(self.pos, self._current_collaborator.pos))
-
-    def set_current_service_request_count(self) -> None:
+    def set_freq_counts(self) -> None:
         """Set the request count for current slot based on cache availability."""
         for ue in self._current_covered_ues:
             req_type, _, req_id = ue.current_request
-            if req_type == 0:  # Service Request
-                if self.cache[req_id]:
+            self._freq_counts[req_id] += 1
+            if self.cache[req_id]:
+                if req_type == 0:
                     self._current_service_request_count += 1
-                elif self._current_collaborator:
+            elif self._current_collaborator:
+                self._current_collaborator._freq_counts[req_id] += 1
+                if req_type == 0:
                     self._current_collaborator._current_service_request_count += 1
 
     def process_requests(self) -> None:
         """Process requests from UEs covered by this UAV."""
         for ue in self._current_covered_ues:
-            if ue.current_request:
-                ue_uav_rate = comms.calculate_ue_uav_rate(comms.calculate_channel_gain(ue.pos, self.pos), len(self._current_covered_ues))
+            ue_uav_rate = comms.calculate_ue_uav_rate(comms.calculate_channel_gain(ue.pos, self.pos), len(self._current_covered_ues))
+            if ue.current_request[0] == 0:  # Service Request
+                self._process_service_request(ue, ue_uav_rate)
+            else:  # Content Request
+                self._process_content_request(ue, ue_uav_rate)
 
-                if ue.current_request[0] == 0:  # Service Request
-                    self._process_service_request(ue, ue_uav_rate)
-                else:  # Content Request
-                    self._process_content_request(ue, ue_uav_rate)
+    def _set_covered_ues(self, ues: List[UE]) -> None:
+        """Set the list of UEs covered by this UAV."""
+        self._current_covered_ues = [ue for ue in ues if np.linalg.norm(self.pos[:2] - ue.pos[:2]) <= config.UAV_COVERAGE_RADIUS]
+
+    def _set_rates(self) -> None:
+        """Set communication rates for UAV-MBS and UAV-UAV links."""
+        self._uav_mbs_rate = comms.calculate_uav_mbs_rate(comms.calculate_channel_gain(self.pos, config.MBS_POS))
+        if self._current_collaborator:
+            self._uav_uav_rate = comms.calculate_uav_uav_rate(comms.calculate_channel_gain(self.pos, self._current_collaborator.pos))
 
     def _process_service_request(self, ue: UE, ue_uav_rate: float) -> None:
         """Process a service request from a UE."""
@@ -158,6 +163,7 @@ class UAV:
 
         ue_assoc_uav_latency = req_size / ue_uav_rate
         cpu_cycles = config.CPU_CYCLES_PER_BYTE[req_id] * req_size
+
         if self.cache[req_id]:
             # Serve locally
             comp_latency, comp_energy = _get_computing_latency_and_energy(self, cpu_cycles)
@@ -209,6 +215,24 @@ class UAV:
             uav_mbs_latency = file_size / self._uav_mbs_rate
             ue.latency_current_request = ue_assoc_uav_latency + uav_mbs_latency
             _try_add_file_to_cache(self, req_id)
+
+    def update_ema_scores(self) -> None:
+        """Update EMA scores for each file."""
+        self._ema_scores = config.GDSF_SMOOTHING_FACTOR * self._freq_counts + (1 - config.GDSF_SMOOTHING_FACTOR) * self._ema_scores
+
+    def gdsf_cache_update(self) -> None:
+        """Update cache using the GDSF caching policy at a longer timescale."""
+        priority_scores = self._ema_scores / config.FILE_SIZES
+        sorted_file_ids = np.argsort(-priority_scores)
+        self.cache = np.zeros(config.NUM_FILES, dtype=bool)
+        used_space = 0.0
+        for file_id in sorted_file_ids:
+            file_size = config.FILE_SIZES[file_id]
+            if used_space + file_size <= config.UAV_STORAGE_CAPACITY[self.id]:
+                self.cache[file_id] = True
+                used_space += file_size
+            else:
+                break
 
     def update_energy_consumption(self) -> None:
         """Update UAV energy consumption for the current time slot."""
