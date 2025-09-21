@@ -18,6 +18,15 @@ class Env:
         """Get current time step."""
         return self._time_step
 
+    # Temporary properties, can be removed later if not needed
+    @property
+    def uavs(self) -> List[UAV]:
+        return self._uavs
+
+    @property
+    def ues(self) -> List[UE]:
+        return self._ues
+
     def _update_positions(self, actions: List[np.ndarray]) -> None:
         """Update positions of UAVs and UEs."""
         for uav, action in zip(self._uavs, actions):
@@ -50,7 +59,7 @@ class Env:
             ue.update_service_coverage(self._time_step)
 
         for uav in self._uavs:
-            uav.update_ema_scores()
+            uav.update_ema_and_cache()
             uav.update_energy_consumption()
 
         # MARL model used at this point
@@ -59,9 +68,10 @@ class Env:
             for uav in self._uavs:
                 uav.gdsf_cache_update()
 
-        total_latency = sum(ue.latency for ue in self._ues)
-        total_energy = sum(uav.energy for uav in self._uavs)
-        sc_metrics = np.array([ue.service_coverage for ue in self._ues])
-        sum_sc = np.sum(sc_metrics)
-        sum_sq_sc = np.sum(sc_metrics**2)
-        jfi = (sum_sc**2) / (config.NUM_UES * sum_sq_sc) if sum_sq_sc > 0 else 0.0
+        # Can be useful later
+        # total_latency = sum(ue.latency for ue in self._ues)
+        # total_energy = sum(uav.energy for uav in self._uavs)
+        # sc_metrics = np.array([ue.service_coverage for ue in self._ues])
+        # sum_sc = np.sum(sc_metrics)
+        # sum_sq_sc = np.sum(sc_metrics**2)
+        # jfi = (sum_sc**2) / (config.NUM_UES * sum_sq_sc) if sum_sq_sc > 0 else 0.0

@@ -2,18 +2,19 @@ import numpy as np
 
 # Simulation Parameters
 MBS_POS: np.ndarray = np.array([0.0, 0.0, 0.0])  # (X_mbs, Y_mbs, Z_mbs) in meters
-NUM_UAVS: int = 5  # U
-NUM_UES: int = 20  # M
+NUM_UAVS: int = 10  # U
+NUM_UES: int = 200  # M
 AREA_WIDTH: int = 1000  # X_max in meters
 AREA_HEIGHT: int = 1000  # Y_max in meters
 SIM_TIME_SLOTS: int = 1000  # Total T
 TIME_SLOT_DURATION: int = 1  # tau in seconds
-UE_MAX_DIST: int = 10  # d_max^UE in meters
+UE_MAX_DIST: int = 50  # d_max^UE in meters
+UE_MAX_WAIT_TIME: int = 5  # in time slots
 
 # UAV Parameters
 UAV_ALTITUDE: int = 100  # H in meters
 UAV_SPEED: int = 50  # v^UAV in m/s
-UAV_STORAGE_CAPACITY: np.ndarray = np.random.choice(np.arange(1e9, 10.1e9, 1e8), size=NUM_UAVS)  # S_u in bytes (1GB to 10GB in 100M steps)
+UAV_STORAGE_CAPACITY: np.ndarray = np.random.choice(np.arange(1e6, 10.1e6, 1e5), size=NUM_UAVS)  # S_u in bytes (1MB to 10MB in 100KB steps)
 UAV_COMPUTING_CAPACITY: np.ndarray = np.random.choice(np.arange(1e9, 10.1e9, 1e8), size=NUM_UAVS)  # F_u in cycles/sec (1GHz to 10GHz in 100M steps)
 UAV_SENSING_RANGE: float = 300.0  # R^sense in meters
 UAV_COVERAGE_RADIUS: float = 100.0  # R in meters
@@ -29,9 +30,9 @@ NUM_SERVICES: int = 50  # S
 NUM_CONTENTS: int = 100  # K
 NUM_FILES: int = NUM_SERVICES + NUM_CONTENTS  # S + K
 CPU_CYCLES_PER_BYTE: np.ndarray = np.random.randint(500, 1500, size=NUM_SERVICES)  # omega_s_m
-FILE_SIZES: np.ndarray = np.random.randint(1_000_000, 100_000_000, size=NUM_FILES)  # 1MB to 100MB
-MIN_INPUT_SIZE: int = 1_000_000  # 1MB
-MAX_INPUT_SIZE: int = 1_000_000_000  # 1GB
+FILE_SIZES: np.ndarray = np.random.randint(1_000, 1_000_000, size=NUM_FILES)  # 1KB to 1MB
+MIN_INPUT_SIZE: int = 1_000  # 1KB
+MAX_INPUT_SIZE: int = 1_000_000  # 1MB
 ZIPF_BETA: float = 0.8
 K_CPU: float = 1e-9  # CPU capacitance coefficient
 T_CACHE_UPDATE_INTERVAL: int = 10  # T_cache

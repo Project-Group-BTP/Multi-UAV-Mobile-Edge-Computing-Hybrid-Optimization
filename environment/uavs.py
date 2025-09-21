@@ -16,9 +16,9 @@ def _get_computing_latency_and_energy(uav: "UAV", cpu_cycles: int) -> Tuple[floa
 
 def _try_add_file_to_cache(uav: "UAV", file_id: int) -> None:
     """Try to add a file to UAV cache if there's enough space."""
-    used_space = np.sum(uav.cache * config.FILE_SIZES)
+    used_space = np.sum(uav._working_cache * config.FILE_SIZES)
     if used_space + config.FILE_SIZES[file_id] <= config.UAV_STORAGE_CAPACITY[uav.id]:
-        uav.cache[file_id] = True
+        uav._working_cache[file_id] = True
 
 
 class UAV:
@@ -35,16 +35,26 @@ class UAV:
         # Cache and request tracking
         self._current_requested_files: np.ndarray = np.zeros(config.NUM_FILES, dtype=bool)
         self.cache: np.ndarray = np.zeros(config.NUM_FILES, dtype=bool)
+        self._working_cache: np.ndarray = np.zeros(config.NUM_FILES, dtype=bool)
         self._freq_counts = np.zeros(config.NUM_FILES)  # For GDSF caching policy
         self._ema_scores = np.zeros(config.NUM_FILES)
 
         # Communication rates
         self._uav_uav_rate: float = 0.0
         self._uav_mbs_rate: float = 0.0
-    
+
     @property
     def energy(self) -> float:
         return self._energy_current_slot
+
+    # Temporary properties, can be removed later if not needed
+    @property
+    def current_covered_ues(self) -> List[UE]:
+        return self._current_covered_ues
+
+    @property
+    def current_collaborator(self) -> Optional["UAV"]:
+        return self._current_collaborator
 
     def reset_for_time_slot(self) -> None:
         """Reset UAV state for a new time slot."""
@@ -82,6 +92,7 @@ class UAV:
     def select_collaborator(self, neighbors: List["UAV"]) -> None:
         """Choose a single collaborating UAV from the list of neighbours."""
         if not neighbors:
+            self._set_rates()
             return
 
         best_collaborators: List["UAV"] = []
@@ -134,11 +145,12 @@ class UAV:
                     self._current_service_request_count += 1
             elif self._current_collaborator:
                 self._current_collaborator._freq_counts[req_id] += 1
-                if req_type == 0:
+                if req_type == 0 and self._current_collaborator.cache[req_id]:
                     self._current_collaborator._current_service_request_count += 1
 
     def process_requests(self) -> None:
         """Process requests from UEs covered by this UAV."""
+        self._working_cache = self.cache.copy()
         for ue in self._current_covered_ues:
             ue_uav_rate = comms.calculate_ue_uav_rate(comms.calculate_channel_gain(ue.pos, self.pos), len(self._current_covered_ues))
             if ue.current_request[0] == 0:  # Service Request
@@ -216,9 +228,10 @@ class UAV:
             ue.latency_current_request = ue_assoc_uav_latency + uav_mbs_latency
             _try_add_file_to_cache(self, req_id)
 
-    def update_ema_scores(self) -> None:
-        """Update EMA scores for each file."""
+    def update_ema_and_cache(self) -> None:
+        """Update EMA scores and cache reactively."""
         self._ema_scores = config.GDSF_SMOOTHING_FACTOR * self._freq_counts + (1 - config.GDSF_SMOOTHING_FACTOR) * self._ema_scores
+        self.cache = self._working_cache.copy()  # Update cache after processing all requests of all UAVs
 
     def gdsf_cache_update(self) -> None:
         """Update cache using the GDSF caching policy at a longer timescale."""
