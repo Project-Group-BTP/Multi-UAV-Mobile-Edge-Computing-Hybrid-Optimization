@@ -7,36 +7,48 @@ from typing import List
 
 class Env:
     def __init__(self) -> None:
-        self.mbs_pos: np.ndarray = config.MBS_POS
+        self._mbs_pos: np.ndarray = config.MBS_POS
         UE.initialize_ue_class()
-        self.ues: List[UE] = [UE(i) for i in range(config.NUM_UES)]
-        self.uavs: List[UAV] = [UAV(i) for i in range(config.NUM_UAVS)]
-        self.time_step: int = 0
+        self._ues: List[UE] = [UE(i) for i in range(config.NUM_UES)]
+        self._uavs: List[UAV] = [UAV(i) for i in range(config.NUM_UAVS)]
+        self._time_step: int = 0
 
-    def update_positions(self, actions: List[np.ndarray]) -> None:
-        for uav, action in zip(self.uavs, actions):
+    @property
+    def time_step(self) -> int:
+        """Get current time step."""
+        return self._time_step
+
+    def _update_positions(self, actions: List[np.ndarray]) -> None:
+        """Update positions of UAVs and UEs."""
+        for uav, action in zip(self._uavs, actions):
             uav.update_position(action[:2])
-        for ue in self.ues:
+        for ue in self._ues:
             ue.update_position()
 
     def step(self, actions: List[np.ndarray]) -> None:
-        for uav in self.uavs:
+        """Execute one time step of the simulation."""
+        for uav in self._uavs:
             uav.reset_for_time_slot()
-        self.time_step += 1
-        self.update_positions(actions)
-        for ue in self.ues:
-            ue.generate_request()
-        for uav in self.uavs:
-            uav.set_current_requested_files(self.ues)
-            uav_neighbors = uav.get_neighbors(self.uavs)
-            uav.select_collaborator(uav_neighbors)
-        for uav in self.uavs:
-            uav.set_current_slot_request_count()
 
-        for uav in self.uavs:
+        self._time_step += 1
+        self._update_positions(actions)
+
+        for ue in self._ues:
+            ue.generate_request()
+
+        for uav in self._uavs:
+            uav.set_current_requested_files(self._ues)
+            uav_neighbors = uav.get_neighbors(self._uavs)
+            uav.select_collaborator(uav_neighbors)
+
+        for uav in self._uavs:
+            uav.set_current_service_request_count()
+
+        for uav in self._uavs:
             uav.process_requests()
 
-        for ue in self.ues:
-            ue.update_service_coverage(self.time_step)
-        for uav in self.uavs:
+        for ue in self._ues:
+            ue.update_service_coverage(self._time_step)
+
+        for uav in self._uavs:
             uav.update_energy_consumption()

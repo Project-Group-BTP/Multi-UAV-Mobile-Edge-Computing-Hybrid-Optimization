@@ -10,7 +10,7 @@ def calculate_channel_gain(pos1: np.ndarray, pos2: np.ndarray) -> float:
 
 def calculate_ue_uav_rate(channel_gain: float, num_associated_ues: int) -> float:
     """Calculates data rate between a UE and a UAV."""
-    assert(num_associated_ues != 0)
+    assert num_associated_ues != 0
     bandwidth_per_ue = config.BANDWIDTH_EDGE / num_associated_ues
     snr = (config.TRANSMIT_POWER * channel_gain) / config.AWGN
     return bandwidth_per_ue * np.log2(1 + snr)
