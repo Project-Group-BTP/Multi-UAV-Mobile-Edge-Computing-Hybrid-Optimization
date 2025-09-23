@@ -5,4 +5,5 @@ __pycache__/
 rough*
 utils/
 train.py
-models/
+model.py
+new_main.py

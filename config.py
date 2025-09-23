@@ -61,7 +61,9 @@ MLP_HIDDEN_DIM: int = 160
 
 LEARNING_RATE: float = 0.001  # alpha
 DISCOUNT_FACTOR: float = 0.99  # gamma
+UPDATE_FACTOR: float = 0.01  # tau
 BUFFER_SIZE: int = 1_000_000  # B
+MAX_GRAD_NORM: float = 1.0  # for gradient clipping
 
 EPSILON: float = 1e-9
 
