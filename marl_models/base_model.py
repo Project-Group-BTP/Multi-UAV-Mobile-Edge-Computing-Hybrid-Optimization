@@ -1,6 +1,11 @@
 from abc import ABC, abstractmethod
-from typing import List
+from typing import List, Dict, Tuple, Union
 import numpy as np
+import torch
+
+OffPolicyExperienceBatch = Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]
+OnPolicyExperienceBatch = Dict[str, torch.Tensor]
+ExperienceBatch = Union[OffPolicyExperienceBatch, OnPolicyExperienceBatch]
 
 
 class MARLModel(ABC):
@@ -20,23 +25,19 @@ class MARLModel(ABC):
     def select_actions(self, observations: List[np.ndarray], exploration: bool) -> np.ndarray:
         """
         Selects actions for all agents based on their observations.
-
-        Args:
-            observations (List[np.ndarray]): A list of observations, one for each agent.
-            exploration (bool): Whether to apply exploration noise/strategy.
-
-        Returns:
-            np.ndarray: A numpy array of shape (num_agents, action_dim).
         """
         pass
 
     @abstractmethod
-    def update(self, batch_size: int):
+    def update(self, batch: ExperienceBatch) -> None:
         """
         Performs a learning update on the model's networks using a batch of experiences.
 
         Args:
-            batch_size (int): The number of experiences to sample from the replay buffer.
+            batch (ExperienceBatch): A dictionary (for on-policy) or a tuple (for off-policy).
+
+        Returns:
+            dict: A dictionary containing loss information for logging.
         """
         pass
 
@@ -46,8 +47,4 @@ class MARLModel(ABC):
 
     @abstractmethod
     def load(self, directory: str):
-        pass
-
-    @abstractmethod
-    def add_to_buffer(self, obs, actions, rewards, next_obs, dones):
         pass

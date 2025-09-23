@@ -1,5 +1,4 @@
-from marl_models.base_model import MARLModel
-from marl_models.buffer import ReplayBuffer
+from marl_models.base_model import MARLModel, ExperienceBatch
 from marl_models.utils import soft_update, GaussianNoise
 from marl_models.maddpg.agents import ActorNetwork, CriticNetwork
 import config
@@ -7,7 +6,7 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 import os
-from typing import List, Tuple
+from typing import List
 
 
 class MADDPG(MARLModel):
@@ -21,14 +20,12 @@ class MADDPG(MARLModel):
         self.critics: List[CriticNetwork] = [CriticNetwork(self.total_obs_dim, self.total_action_dim).to(device) for _ in range(num_agents)]
         self.target_actors: List[ActorNetwork] = [ActorNetwork(obs_dim, action_dim).to(device) for _ in range(num_agents)]
         self.target_critics: List[CriticNetwork] = [CriticNetwork(self.total_obs_dim, self.total_action_dim).to(device) for _ in range(num_agents)]
+        
         self._init_target_networks()
 
         # Create optimizers
         self.actor_optimizers: List[torch.optim.Adam] = [torch.optim.Adam(actor.parameters(), lr=config.LEARNING_RATE) for actor in self.actors]
         self.critic_optimizers: List[torch.optim.Adam] = [torch.optim.Adam(critic.parameters(), lr=config.LEARNING_RATE) for critic in self.critics]
-
-        # Replay Buffer
-        self.buffer: ReplayBuffer = ReplayBuffer(config.BUFFER_SIZE)
 
         # Exploration Noise
         self.noise: List[GaussianNoise] = [GaussianNoise() for _ in range(num_agents)]
@@ -47,22 +44,16 @@ class MADDPG(MARLModel):
 
         return np.array(actions)
 
-    def add_to_buffer(self, obs: np.ndarray, actions: np.ndarray, rewards: np.ndarray, next_obs: np.ndarray, dones: np.ndarray) -> None:
-        self.buffer.add(obs, actions, rewards, next_obs, dones)
-
-    def update(self, batch_size: int) -> None:
-        if len(self.buffer) < batch_size:
-            return
-
-        batch_data: Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray] = self.buffer.sample(batch_size)
-        obs_batch, actions_batch, rewards_batch, next_obs_batch, dones_batch = batch_data
-
+    def update(self, batch: ExperienceBatch) -> None:
+        assert isinstance(batch, tuple) and len(batch) == 5, "MADDPG expects OffPolicyExperienceBatch (tuple of 5 elements)"
+        obs_batch, actions_batch, rewards_batch, next_obs_batch, dones_batch = batch
         obs_tensor: torch.Tensor = torch.as_tensor(obs_batch, dtype=torch.float32, device=self.device)
         actions_tensor: torch.Tensor = torch.as_tensor(actions_batch, dtype=torch.float32, device=self.device)
         rewards_tensor: torch.Tensor = torch.as_tensor(rewards_batch, dtype=torch.float32, device=self.device)
         next_obs_tensor: torch.Tensor = torch.as_tensor(next_obs_batch, dtype=torch.float32, device=self.device)
         dones_tensor: torch.Tensor = torch.as_tensor(dones_batch, dtype=torch.float32, device=self.device)
 
+        batch_size: int = obs_tensor.shape[0]  # Get batch size from the data
         obs_flat: torch.Tensor = obs_tensor.reshape(batch_size, -1)
         next_obs_flat: torch.Tensor = next_obs_tensor.reshape(batch_size, -1)
         actions_flat: torch.Tensor = actions_tensor.reshape(batch_size, -1)
@@ -104,7 +95,6 @@ class MADDPG(MARLModel):
             n.decay()
 
     def _init_target_networks(self) -> None:
-        # Copy initial weights
         for actor, target_actor in zip(self.actors, self.target_actors):
             target_actor.load_state_dict(actor.state_dict())
         for critic, target_critic in zip(self.critics, self.target_critics):
@@ -121,6 +111,5 @@ class MADDPG(MARLModel):
         for i in range(self.num_agents):
             self.actors[i].load_state_dict(torch.load(os.path.join(directory, f"actor_{i}.pth")))
             self.critics[i].load_state_dict(torch.load(os.path.join(directory, f"critic_{i}.pth")))
-            # Also load target networks for stability
             self.target_actors[i].load_state_dict(self.actors[i].state_dict())
             self.target_critics[i].load_state_dict(self.critics[i].state_dict())

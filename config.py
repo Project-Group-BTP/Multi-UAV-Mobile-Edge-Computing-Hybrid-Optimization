@@ -81,3 +81,35 @@ RESUME_DIRECTORY: str = ""  # path to saved model directory to resume training f
 INITIAL_NOISE_SCALE: float = 1.0
 MIN_NOISE_SCALE: float = 0.1
 NOISE_DECAY_RATE: float = 0.995
+
+# --- MATD3 Specific Hyperparameters ---
+# The 'd' parameter from the paper: update policy and targets every 'd' critic updates.
+POLICY_UPDATE_FREQ = 2
+
+# The standard deviation 'sigma' for the noise added to target policy actions.
+TARGET_POLICY_NOISE = 0.2
+
+# The clipping value 'c' for the target policy noise.
+NOISE_CLIP = 0.5
+
+# --- MAPPO Specific Hyperparameters ---
+LOG_STD_MAX = 2
+LOG_STD_MIN = -20
+# Learning rates for the Actor and Critic networks
+PPO_ACTOR_LR = 3e-4
+PPO_CRITIC_LR = 1e-3
+
+# The number of training epochs to run on the collected rollout data
+PPO_EPOCHS = 10
+
+# The size of mini-batches to use during the PPO update step
+PPO_MINIBATCH_SIZE = 64
+
+# The clipping parameter (epsilon) for the PPO surrogate objective function
+PPO_CLIP_EPS = 0.2
+
+# The coefficient for the entropy bonus, encouraging exploration
+PPO_ENTROPY_COEF = 0.01
+
+# The coefficient for the value function loss in the total loss calculation
+PPO_VALUE_COEF = 0.5
