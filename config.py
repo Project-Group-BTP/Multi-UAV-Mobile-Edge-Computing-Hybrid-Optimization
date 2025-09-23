@@ -113,3 +113,5 @@ PPO_ENTROPY_COEF = 0.01
 
 # The coefficient for the value function loss in the total loss calculation
 PPO_VALUE_COEF = 0.5
+
+PPO_MAX_GRAD_NORM = 0.5  # for gradient clipping
