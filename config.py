@@ -1,12 +1,25 @@
 import numpy as np
 
+# Training Parameters
+NUM_EPISODES: int = 500
+MODEL: str = "mappo"  # Options: 'maddpg', 'matd3', 'mappo', 'random', 'greedy'
+SAVE_FREQ = NUM_EPISODES // 10
+if NUM_EPISODES < 1000:
+    SAVE_FREQ = 100
+BATCH_SIZE: int = 32
+STEPS_PER_EPISODE: int = 1000  # Total T
+LOG_FREQ: int = 10
+IMG_FREQ: int = 100  # save image every 100 episodes
+LEARN_FREQ: int = 5  # learn every 5 steps
+
+RESUME_DIRECTORY: str = ""  # path to saved model directory to resume training from
+
 # Simulation Parameters
 MBS_POS: np.ndarray = np.array([0.0, 0.0, 0.0])  # (X_mbs, Y_mbs, Z_mbs) in meters
 NUM_UAVS: int = 10  # U
 NUM_UES: int = 200  # M
 AREA_WIDTH: int = 1000  # X_max in meters
 AREA_HEIGHT: int = 1000  # Y_max in meters
-SIM_TIME_SLOTS: int = 1000  # Total T
 TIME_SLOT_DURATION: int = 1  # tau in seconds
 UE_MAX_DIST: int = 50  # d_max^UE in meters
 UE_MAX_WAIT_TIME: int = 5  # in time slots
@@ -62,20 +75,14 @@ MLP_HIDDEN_DIM: int = 160
 LEARNING_RATE: float = 0.001  # alpha
 DISCOUNT_FACTOR: float = 0.99  # gamma
 UPDATE_FACTOR: float = 0.01  # tau
-BUFFER_SIZE: int = 1_000_000  # B
+
+# MADDPG Specific Hyperparameters
+REPLAY_BUFFER_SIZE: int = 1_000_000  # B
 MAX_GRAD_NORM: float = 1.0  # for gradient clipping
+INITIAL_RANDOM_STEPS: int = 10  # steps of random actions for exploration
+
 
 EPSILON: float = 1e-9
-
-# Training Parameters
-NUM_EPISODES: int = 500
-MAX_STEPS: int = 300
-BATCH_SIZE: int = 32
-LOG_FREQ: int = 10
-IMG_FREQ: int = 100  # save image every 100 episodes
-LEARN_FREQ: int = 5  # learn every 5 steps
-
-RESUME_DIRECTORY: str = ""  # path to saved model directory to resume training from
 
 # Gaussian Noise Parameters
 INITIAL_NOISE_SCALE: float = 1.0

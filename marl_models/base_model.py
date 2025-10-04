@@ -15,14 +15,15 @@ class MARLModel(ABC):
     must have to be compatible with the training framework.
     """
 
-    def __init__(self, num_agents: int, obs_dim: int, action_dim: int, device: str):
+    def __init__(self, model_name: str, num_agents: int, obs_dim: int, action_dim: int, device: str):
+        self.model_name = model_name
         self.num_agents = num_agents
         self.obs_dim = obs_dim
         self.action_dim = action_dim
         self.device = device
 
     @abstractmethod
-    def select_actions(self, observations: List[np.ndarray], exploration: bool) -> np.ndarray:
+    def select_actions(self, observations: List[np.ndarray], exploration: bool) -> List[np.ndarray]:
         """
         Selects actions for all agents based on their observations.
         """
@@ -38,6 +39,13 @@ class MARLModel(ABC):
 
         Returns:
             dict: A dictionary containing loss information for logging.
+        """
+        pass
+
+    @abstractmethod
+    def reset(self) -> None:
+        """
+        Resets the model's internal state (if any) for a new episode.
         """
         pass
 

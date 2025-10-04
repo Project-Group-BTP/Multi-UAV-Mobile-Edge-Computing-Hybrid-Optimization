@@ -27,8 +27,7 @@ class RolloutBuffer:  # It stores transitions, computes advantages, and provides
 
         self.step: int = 0
 
-    def add(self, state: np.ndarray, obs: np.ndarray, actions: np.ndarray, log_probs: np.ndarray, 
-            rewards: np.ndarray, dones: np.ndarray, values: np.ndarray) -> None:
+    def add(self, state: np.ndarray, obs: np.ndarray, actions: np.ndarray, log_probs: np.ndarray, rewards: np.ndarray, dones: np.ndarray, values: np.ndarray) -> None:
         if self.step >= self.buffer_size:
             raise ValueError("Rollout buffer overflow")
 

@@ -10,8 +10,8 @@ from typing import List, Tuple
 
 
 class MATD3(MARLModel):
-    def __init__(self, num_agents: int, obs_dim: int, action_dim: int, device: str) -> None:
-        super().__init__(num_agents, obs_dim, action_dim, device)
+    def __init__(self, model_name: str, num_agents: int, obs_dim: int, action_dim: int, device: str) -> None:
+        super().__init__(model_name, num_agents, obs_dim, action_dim, device)
         self.total_obs_dim: int = num_agents * obs_dim
         self.total_action_dim: int = num_agents * action_dim
 
@@ -36,7 +36,7 @@ class MATD3(MARLModel):
         # Delayed Updates Counter
         self.update_counter: int = 0
 
-    def select_actions(self, observations: List[np.ndarray], exploration: bool) -> np.ndarray:
+    def select_actions(self, observations: List[np.ndarray], exploration: bool) -> List[np.ndarray]:
         """Selects actions for all agents based on their observations (decentralized execution)."""
         actions: List[np.ndarray] = []
         with torch.no_grad():
@@ -134,6 +134,10 @@ class MATD3(MARLModel):
         for critic2, target_critic2 in zip(self.critics_2, self.target_critics_2):
             target_critic2.load_state_dict(critic2.state_dict())
 
+    def reset(self) -> None:
+        for n in self.noise:
+            n.reset()
+
     def save(self, directory: str) -> None:
         if not os.path.exists(directory):
             os.makedirs(directory)
@@ -141,12 +145,21 @@ class MATD3(MARLModel):
             torch.save(self.actors[i].state_dict(), os.path.join(directory, f"actor_{i}.pth"))
             torch.save(self.critics_1[i].state_dict(), os.path.join(directory, f"critic_1_{i}.pth"))
             torch.save(self.critics_2[i].state_dict(), os.path.join(directory, f"critic_2_{i}.pth"))
+            torch.save(self.target_actors[i].state_dict(), os.path.join(directory, f"target_actor_{i}.pth"))
+            torch.save(self.target_critics_1[i].state_dict(), os.path.join(directory, f"target_critic_1_{i}.pth"))
+            torch.save(self.target_critics_2[i].state_dict(), os.path.join(directory, f"target_critic_2_{i}.pth"))
+            torch.save(self.actor_optimizers[i].state_dict(), os.path.join(directory, f"actor_optimizer_{i}.pth"))
+            torch.save(self.critic_1_optimizers[i].state_dict(), os.path.join(directory, f"critic_1_optimizer_{i}.pth"))
+            torch.save(self.critic_2_optimizers[i].state_dict(), os.path.join(directory, f"critic_2_optimizer_{i}.pth"))
 
     def load(self, directory: str) -> None:
         for i in range(self.num_agents):
             self.actors[i].load_state_dict(torch.load(os.path.join(directory, f"actor_{i}.pth")))
             self.critics_1[i].load_state_dict(torch.load(os.path.join(directory, f"critic_1_{i}.pth")))
             self.critics_2[i].load_state_dict(torch.load(os.path.join(directory, f"critic_2_{i}.pth")))
-            self.target_actors[i].load_state_dict(self.actors[i].state_dict())
-            self.target_critics_1[i].load_state_dict(self.critics_1[i].state_dict())
-            self.target_critics_2[i].load_state_dict(self.critics_2[i].state_dict())
+            self.target_actors[i].load_state_dict(torch.load(os.path.join(directory, f"target_actor_{i}.pth")))
+            self.target_critics_1[i].load_state_dict(torch.load(os.path.join(directory, f"target_critic_1_{i}.pth")))
+            self.target_critics_2[i].load_state_dict(torch.load(os.path.join(directory, f"target_critic_2_{i}.pth")))
+            self.actor_optimizers[i].load_state_dict(torch.load(os.path.join(directory, f"actor_optimizer_{i}.pth")))
+            self.critic_1_optimizers[i].load_state_dict(torch.load(os.path.join(directory, f"critic_1_optimizer_{i}.pth")))
+            self.critic_2_optimizers[i].load_state_dict(torch.load(os.path.join(directory, f"critic_2_optimizer_{i}.pth")))

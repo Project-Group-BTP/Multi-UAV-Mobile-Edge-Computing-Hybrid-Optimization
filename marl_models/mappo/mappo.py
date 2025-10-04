@@ -9,8 +9,8 @@ from torch.distributions import Normal
 
 
 class MAPPO(MARLModel):
-    def __init__(self, num_agents: int, obs_dim: int, action_dim: int, state_dim: int, device: str) -> None:
-        super().__init__(num_agents, obs_dim, action_dim, device)
+    def __init__(self, model_name: str, num_agents: int, obs_dim: int, action_dim: int, state_dim: int, device: str) -> None:
+        super().__init__(model_name, num_agents, obs_dim, action_dim, device)
         self.state_dim: int = state_dim
 
         # Create networks
@@ -21,7 +21,7 @@ class MAPPO(MARLModel):
         self.actor_optimizer: torch.optim.Adam = torch.optim.Adam(self.actors.parameters(), lr=config.PPO_ACTOR_LR, eps=1e-5)
         self.critic_optimizer: torch.optim.Adam = torch.optim.Adam(self.critics.parameters(), lr=config.PPO_CRITIC_LR, eps=1e-5)
 
-    def select_actions(self, observations: List[np.ndarray], exploration: bool) -> np.ndarray:
+    def select_actions(self, observations: List[np.ndarray], exploration: bool) -> List[np.ndarray]:
         obs_tensor: torch.Tensor = torch.as_tensor(np.array(observations), dtype=torch.float32, device=self.device)
         with torch.no_grad():
             dist: Normal = self.actors(obs_tensor)
@@ -103,12 +103,17 @@ class MAPPO(MARLModel):
         torch.nn.utils.clip_grad_norm_(self.critics.parameters(), config.PPO_MAX_GRAD_NORM)
         self.critic_optimizer.step()
 
+    def reset(self) -> None:
+        pass  # Nothing to reset
+
     def save(self, directory: str) -> None:
-        if not os.path.exists(directory):
-            os.makedirs(directory)
         torch.save(self.actors.state_dict(), os.path.join(directory, "mappo_actor.pth"))
         torch.save(self.critics.state_dict(), os.path.join(directory, "mappo_critic.pth"))
+        torch.save(self.actor_optimizer.state_dict(), os.path.join(directory, "mappo_actor_optimizer.pth"))
+        torch.save(self.critic_optimizer.state_dict(), os.path.join(directory, "mappo_critic_optimizer.pth"))
 
     def load(self, directory: str) -> None:
         self.actors.load_state_dict(torch.load(os.path.join(directory, "mappo_actor.pth")))
         self.critics.load_state_dict(torch.load(os.path.join(directory, "mappo_critic.pth")))
+        self.actor_optimizer.load_state_dict(torch.load(os.path.join(directory, "mappo_actor_optimizer.pth")))
+        self.critic_optimizer.load_state_dict(torch.load(os.path.join(directory, "mappo_critic_optimizer.pth")))
