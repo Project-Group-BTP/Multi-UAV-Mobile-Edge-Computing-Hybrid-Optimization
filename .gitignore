@@ -5,15 +5,8 @@ __pycache__/
 *.pth
 *.png
 rough*
-utils/
-train.py
-model.py
-new_main.py
+idea*
 simulation_frames/
 
-
-compare.py
-evaluate.py
-idea.md
-train*
-greedy*
+# temporary
+new_main.py

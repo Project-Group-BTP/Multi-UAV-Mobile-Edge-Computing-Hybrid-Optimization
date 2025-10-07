@@ -1,11 +1,10 @@
 from abc import ABC, abstractmethod
-from typing import List, Dict, Tuple, Union
 import numpy as np
 import torch
 
-OffPolicyExperienceBatch = Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]
-OnPolicyExperienceBatch = Dict[str, torch.Tensor]
-ExperienceBatch = Union[OffPolicyExperienceBatch, OnPolicyExperienceBatch]
+OffPolicyExperienceBatch = tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]
+OnPolicyExperienceBatch = dict[str, torch.Tensor]
+ExperienceBatch = OffPolicyExperienceBatch | OnPolicyExperienceBatch
 
 
 class MARLModel(ABC):
@@ -15,15 +14,22 @@ class MARLModel(ABC):
     must have to be compatible with the training framework.
     """
 
-    def __init__(self, model_name: str, num_agents: int, obs_dim: int, action_dim: int, device: str):
+    def __init__(self, model_name: str, num_agents: int, obs_dim: int, action_dim: int, device: str) -> None:
         self.model_name = model_name
         self.num_agents = num_agents
         self.obs_dim = obs_dim
         self.action_dim = action_dim
         self.device = device
 
+    def get_action_and_value(self, obs: np.ndarray, state: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """
+        Gets actions, log probabilities, and state values.
+        Essential for on-policy algorithms like PPO.
+        """
+        raise NotImplementedError("This method is required for on-policy algorithms.")
+
     @abstractmethod
-    def select_actions(self, observations: List[np.ndarray], exploration: bool) -> List[np.ndarray]:
+    def select_actions(self, observations: list[np.ndarray], exploration: bool) -> np.ndarray:
         """
         Selects actions for all agents based on their observations.
         """
@@ -36,9 +42,6 @@ class MARLModel(ABC):
 
         Args:
             batch (ExperienceBatch): A dictionary (for on-policy) or a tuple (for off-policy).
-
-        Returns:
-            dict: A dictionary containing loss information for logging.
         """
         pass
 
@@ -50,9 +53,9 @@ class MARLModel(ABC):
         pass
 
     @abstractmethod
-    def save(self, directory: str):
+    def save(self, directory: str) -> None:
         pass
 
     @abstractmethod
-    def load(self, directory: str):
+    def load(self, directory: str) -> None:
         pass

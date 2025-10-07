@@ -1,21 +1,27 @@
+from marl_models.base_model import OffPolicyExperienceBatch
+import config
 import torch
-import random
 import numpy as np
 from collections import deque
-from typing import Deque, List, Tuple, Dict, Generator
+from collections.abc import Generator
 
 
 class ReplayBuffer:
     def __init__(self, max_size: int) -> None:
-        self.buffer: Deque[Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]] = deque(maxlen=max_size)
+        self.buffer: deque[OffPolicyExperienceBatch] = deque(maxlen=max_size)
 
-    def add(self, obs: np.ndarray, actions: np.ndarray, rewards: np.ndarray, next_obs: np.ndarray, dones: np.ndarray) -> None:
+    def add(self, obs: list[np.ndarray], actions: np.ndarray, rewards: list[float], next_obs: list[np.ndarray], done: bool) -> None:
         """Store one experience tuple: (joint_obs, joint_actions, joint_rewards, joint_next_obs, joint_dones)"""
-        self.buffer.append((obs, actions, rewards, next_obs, dones))
+        obs_arr: np.ndarray = np.array(obs)
+        next_obs_arr: np.ndarray = np.array(next_obs)
+        rewards_arr: np.ndarray = np.array(rewards)
+        dones_arr: np.ndarray = np.array([done] * config.NUM_UAVS)
+        self.buffer.append((obs_arr, actions, rewards_arr, next_obs_arr, dones_arr))
 
-    def sample(self, batch_size: int) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def sample(self, batch_size: int) -> OffPolicyExperienceBatch:
         """Sample a batch of experiences."""
-        batch: List[Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]] = random.sample(self.buffer, batch_size)
+        indices: np.ndarray = np.random.choice(len(self.buffer), batch_size, replace=False)
+        batch: list[OffPolicyExperienceBatch] = [self.buffer[i] for i in indices]
         obs_batch, actions_batch, rewards_batch, next_obs_batch, dones_batch = map(np.array, zip(*batch))
         return obs_batch, actions_batch, rewards_batch, next_obs_batch, dones_batch
 
@@ -23,7 +29,7 @@ class ReplayBuffer:
         return len(self.buffer)
 
 
-class RolloutBuffer:  # It stores transitions, computes advantages, and provides mini-batches.
+class RolloutBuffer:
     def __init__(self, num_agents: int, obs_dim: int, action_dim: int, state_dim: int, buffer_size: int, device: str) -> None:
         self.num_agents: int = num_agents
         self.obs_dim: int = obs_dim
@@ -62,14 +68,9 @@ class RolloutBuffer:  # It stores transitions, computes advantages, and provides
         self.step += 1
 
     def compute_returns_and_advantages(self, last_values: np.ndarray, gamma: float, gae_lambda: float) -> None:
-        """
-        Computes the advantages and returns for the collected trajectories using GAE.
-        This should be called at the end of a rollout.
-        """
+        """Computes the advantages and returns for the collected trajectories using GAE."""
         last_gae_lam: float = 0.0
         for t in reversed(range(self.buffer_size)):
-            is_terminal: float = self.dones[t, 0]
-
             if t == self.buffer_size - 1:
                 next_values: np.ndarray = last_values
             else:
@@ -80,10 +81,8 @@ class RolloutBuffer:  # It stores transitions, computes advantages, and provides
 
         self.returns = self.advantages + self.values
 
-    def get_batches(self, batch_size: int) -> Generator[Dict[str, torch.Tensor], None, None]:
-        """
-        A generator that yields mini-batches from the buffer.
-        """
+    def get_batches(self, batch_size: int) -> Generator[dict[str, torch.Tensor], None, None]:
+        """A generator that yields mini-batches from the buffer."""
         num_samples: int = self.buffer_size * self.num_agents
 
         states: np.ndarray = np.repeat(self.states, self.num_agents, axis=0)

@@ -6,7 +6,6 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 import os
-from typing import List
 
 
 class MADDPG(MARLModel):
@@ -16,22 +15,21 @@ class MADDPG(MARLModel):
         self.total_action_dim: int = num_agents * action_dim
 
         # Create networks for each agent
-        self.actors: List[ActorNetwork] = [ActorNetwork(obs_dim, action_dim).to(device) for _ in range(num_agents)]
-        self.critics: List[CriticNetwork] = [CriticNetwork(self.total_obs_dim, self.total_action_dim).to(device) for _ in range(num_agents)]
-        self.target_actors: List[ActorNetwork] = [ActorNetwork(obs_dim, action_dim).to(device) for _ in range(num_agents)]
-        self.target_critics: List[CriticNetwork] = [CriticNetwork(self.total_obs_dim, self.total_action_dim).to(device) for _ in range(num_agents)]
-        
+        self.actors: list[ActorNetwork] = [ActorNetwork(obs_dim, action_dim).to(device) for _ in range(num_agents)]
+        self.critics: list[CriticNetwork] = [CriticNetwork(self.total_obs_dim, self.total_action_dim).to(device) for _ in range(num_agents)]
+        self.target_actors: list[ActorNetwork] = [ActorNetwork(obs_dim, action_dim).to(device) for _ in range(num_agents)]
+        self.target_critics: list[CriticNetwork] = [CriticNetwork(self.total_obs_dim, self.total_action_dim).to(device) for _ in range(num_agents)]
         self._init_target_networks()
 
         # Create optimizers
-        self.actor_optimizers: List[torch.optim.Adam] = [torch.optim.Adam(actor.parameters(), lr=config.LEARNING_RATE) for actor in self.actors]
-        self.critic_optimizers: List[torch.optim.Adam] = [torch.optim.Adam(critic.parameters(), lr=config.LEARNING_RATE) for critic in self.critics]
+        self.actor_optimizers: list[torch.optim.Adam] = [torch.optim.Adam(actor.parameters(), lr=config.ACTOR_LR) for actor in self.actors]
+        self.critic_optimizers: list[torch.optim.Adam] = [torch.optim.Adam(critic.parameters(), lr=config.CRITIC_LR) for critic in self.critics]
 
         # Exploration Noise
-        self.noise: List[GaussianNoise] = [GaussianNoise() for _ in range(num_agents)]
+        self.noise: list[GaussianNoise] = [GaussianNoise() for _ in range(num_agents)]
 
-    def select_actions(self, observations: List[np.ndarray], exploration: bool) -> List[np.ndarray]:
-        actions: List[np.ndarray] = []
+    def select_actions(self, observations: list[np.ndarray], exploration: bool) -> np.ndarray:
+        actions: list[np.ndarray] = []
         with torch.no_grad():
             for i, obs in enumerate(observations):
                 obs_tensor: torch.Tensor = torch.tensor(obs, dtype=torch.float32, device=self.device).unsqueeze(0)
@@ -59,9 +57,9 @@ class MADDPG(MARLModel):
         actions_flat: torch.Tensor = actions_tensor.reshape(batch_size, -1)
 
         for agent_idx in range(self.num_agents):
-            # ----- Update Critic -----
+            # Update Critic
             with torch.no_grad():
-                next_actions: List[torch.Tensor] = [self.target_actors[i](next_obs_tensor[:, i, :]) for i in range(self.num_agents)]
+                next_actions: list[torch.Tensor] = [self.target_actors[i](next_obs_tensor[:, i, :]) for i in range(self.num_agents)]
                 next_actions_tensor: torch.Tensor = torch.cat(next_actions, dim=1)
                 target_q_value: torch.Tensor = self.target_critics[agent_idx](next_obs_flat, next_actions_tensor)
                 agent_reward: torch.Tensor = rewards_tensor[:, agent_idx].unsqueeze(1)
@@ -76,7 +74,7 @@ class MADDPG(MARLModel):
             torch.nn.utils.clip_grad_norm_(self.critics[agent_idx].parameters(), config.MAX_GRAD_NORM)
             self.critic_optimizers[agent_idx].step()
 
-            # ----- Update Actor -----
+            # Update Actor
             pred_actions_tensor: torch.Tensor = actions_tensor.detach().clone()
             pred_actions_tensor[:, agent_idx, :] = self.actors[agent_idx](obs_tensor[:, agent_idx, :])
             pred_actions_flat: torch.Tensor = pred_actions_tensor.reshape(batch_size, -1)
@@ -87,7 +85,7 @@ class MADDPG(MARLModel):
             torch.nn.utils.clip_grad_norm_(self.actors[agent_idx].parameters(), config.MAX_GRAD_NORM)
             self.actor_optimizers[agent_idx].step()
 
-            # ----- Soft update target networks -----
+            # Soft update target networks
             soft_update(self.target_actors[agent_idx], self.actors[agent_idx], config.UPDATE_FACTOR)
             soft_update(self.target_critics[agent_idx], self.critics[agent_idx], config.UPDATE_FACTOR)
 
@@ -106,18 +104,30 @@ class MADDPG(MARLModel):
 
     def save(self, directory: str) -> None:
         for i in range(self.num_agents):
-            torch.save(self.actors[i].state_dict(), os.path.join(directory, f"actor_{i}.pth"))
-            torch.save(self.critics[i].state_dict(), os.path.join(directory, f"critic_{i}.pth"))
-            torch.save(self.target_actors[i].state_dict(), os.path.join(directory, f"target_actor_{i}.pth"))
-            torch.save(self.target_critics[i].state_dict(), os.path.join(directory, f"target_critic_{i}.pth"))
-            torch.save(self.actor_optimizers[i].state_dict(), os.path.join(directory, f"actor_optimizer_{i}.pth"))
-            torch.save(self.critic_optimizers[i].state_dict(), os.path.join(directory, f"critic_optimizer_{i}.pth"))
+            torch.save(
+                {
+                    "actor": self.actors[i].state_dict(),
+                    "critic": self.critics[i].state_dict(),
+                    "target_actor": self.target_actors[i].state_dict(),
+                    "target_critic": self.target_critics[i].state_dict(),
+                    "actor_optimizer": self.actor_optimizers[i].state_dict(),
+                    "critic_optimizer": self.critic_optimizers[i].state_dict(),
+                },
+                os.path.join(directory, f"agent_{i}.pth"),
+            )
 
     def load(self, directory: str) -> None:
+        if not os.path.exists(directory):
+            raise FileNotFoundError(f"❌ Model directory not found: {directory}")
+
         for i in range(self.num_agents):
-            self.actors[i].load_state_dict(torch.load(os.path.join(directory, f"actor_{i}.pth")))
-            self.critics[i].load_state_dict(torch.load(os.path.join(directory, f"critic_{i}.pth")))
-            self.target_actors[i].load_state_dict(torch.load(os.path.join(directory, f"target_actor_{i}.pth")))
-            self.target_critics[i].load_state_dict(torch.load(os.path.join(directory, f"target_critic_{i}.pth")))
-            self.actor_optimizers[i].load_state_dict(torch.load(os.path.join(directory, f"actor_optimizer_{i}.pth")))
-            self.critic_optimizers[i].load_state_dict(torch.load(os.path.join(directory,
+            agent_path: str = os.path.join(directory, f"agent_{i}.pth")
+            if not os.path.exists(agent_path):
+                raise FileNotFoundError(f"❌ Model file not found: {agent_path}")
+            checkpoint: dict = torch.load(agent_path, map_location=self.device)
+            self.actors[i].load_state_dict(checkpoint["actor"])
+            self.critics[i].load_state_dict(checkpoint["critic"])
+            self.target_actors[i].load_state_dict(checkpoint["target_actor"])
+            self.target_critics[i].load_state_dict(checkpoint["target_critic"])
+            self.actor_optimizers[i].load_state_dict(checkpoint["actor_optimizer"])
+            self.critic_optimizers[i].load_state_dict(checkpoint["critic_optimizer"])

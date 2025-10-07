@@ -1,6 +1,5 @@
 import config
 import numpy as np
-from typing import Tuple
 
 
 class UE:
@@ -27,7 +26,7 @@ class UE:
         self.id: int = ue_id
         self.pos: np.ndarray = np.array([np.random.uniform(0, config.AREA_WIDTH), np.random.uniform(0, config.AREA_HEIGHT), 0.0])
 
-        self.current_request: Tuple[int, int, int] = (0, 0, 0)  # Request : (req_type, req_size, req_id)
+        self.current_request: tuple[int, int, int] = (0, 0, 0)  # Request : (req_type, req_size, req_id)
         self.latency_current_request: float = 0.0  # Latency for the current request
 
         # Random Waypoint Model

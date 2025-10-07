@@ -14,7 +14,6 @@ class ActorNetwork(nn.Module):
     def forward(self, input: torch.Tensor) -> torch.Tensor:
         x: torch.Tensor = F.relu(self.fc1(input))
         x = F.relu(self.fc2(x))
-        # Rethink
         return torch.tanh(self.out(x))
 
 

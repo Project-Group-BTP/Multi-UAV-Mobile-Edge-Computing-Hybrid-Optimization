@@ -1,60 +1,96 @@
-from marl_models.utils import get_device
+from marl_models.utils import get_model
 from marl_models.base_model import MARLModel
-from marl_models.maddpg.maddpg import MADDPG
-from marl_models.matd3.matd3 import MATD3
-from marl_models.mappo.mappo import MAPPO
-from marl_models.random_baseline.random_model import RandomModel
-from marl_models.greedy_baseline.greedy_model import GreedyModel
 from environment.env import Env
 from train import train_on_policy, train_off_policy
+from test import test_model
 from utils.logger import Logger
+from utils.plot_logs import generate_plots
 import config
+import torch
+import numpy as np
 import argparse
-import time
 from datetime import datetime
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Train model")
-    parser.add_argument("--resume", type=bool, help="Resume training from saved model", default=False)
-    args = parser.parse_args()
-
-    model_name = config.MODEL.lower()
-    env: Env = Env()
-    model: MARLModel
-    device = get_device()
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    print(f"\n🚀 Training started at {timestamp} for {config.NUM_EPISODES} episodes\n")
-    logger = Logger(
+def start_training(args: argparse.Namespace):
+    timestamp: str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    print(f"\n🚀 Training started at {timestamp} for {args.num_episodes} episodes\n")
+    logger: Logger = Logger(
         log_dir="./train_logs",
         log_file_name=f"logs_{timestamp}.txt",
         log_data_file_name=f"log_data_{timestamp}.json",
+        config_file_name=f"config_{timestamp}.json",
     )
+    logger.log_configs()
 
-    if model_name == "maddpg":
-        model = MADDPG(model_name=model_name, num_agents=config.NUM_UAVS, obs_dim=config.OBS_DIM_SINGLE, action_dim=config.ACTION_DIM, device=device)
-    elif model_name == "matd3":
-        model = MATD3(model_name=model_name, num_agents=config.NUM_UAVS, obs_dim=config.OBS_DIM_SINGLE, action_dim=config.ACTION_DIM, device=device)
-    elif model_name == "mappo":
-        model = MAPPO(model_name=model_name, num_agents=config.NUM_UAVS, obs_dim=config.OBS_DIM_SINGLE, action_dim=config.ACTION_DIM, state_dim=config.NUM_UAVS * config.OBS_DIM_SINGLE, device=device)
-    elif model_name == "random":
-        model = RandomModel(model_name=model_name, num_agents=config.NUM_UAVS, obs_dim=config.OBS_DIM_SINGLE, action_dim=config.ACTION_DIM, device=device)
-    elif model_name == "greedy":
-        model = GreedyModel(model_name=model_name, num_agents=config.NUM_UAVS, obs_dim=config.OBS_DIM_SINGLE, action_dim=config.ACTION_DIM, device=device)
-        model.set_environment(env)
-    else:
-        raise ValueError(f"Unknown model type: {model_name}. " f"Supported types: maddpg, matd3, mappo, random, greedy")
+    if args.resume:
+        logger.load_configs(f"{config.RESUME_DIRECTORY}/config.json")
+
+    np.random.seed(config.SEED)
+    torch.manual_seed(config.SEED)
+    env: Env = Env()
+    model_name: str = config.MODEL.lower()
+    model: MARLModel = get_model(model_name)
 
     if args.resume:
         model.load(config.RESUME_DIRECTORY)
+        print(f"📥 Models loaded successfully from {config.RESUME_DIRECTORY}")
         print(f"📂 Resumed training from: {config.RESUME_DIRECTORY}\n")
 
-    start_time = time.time()
-    if model_name in ["maddpg", "matd3"]:
-        train_off_policy(env, model, model_name, args.resume)
+    if model_name in ["maddpg", "matd3", "masac"]:
+        train_off_policy(env, model, logger, args.num_episodes)
     elif model_name == "mappo":
-        train_on_policy(env, model, model_name, args.resume)
+        train_on_policy(env, model, logger, args.num_episodes)
+    else:  # "random"
+        test_model(env, model, logger, args.num_episodes)  # Training = Testing for random model
+
+    print("✅ Training Completed!\n")
+    print("📊 Generating plots...\n")
+    generate_plots(log_file=f"./train_logs/log_data_{timestamp}.json", output_dir="./train_plots/", output_file_prefix="train")
+
+
+def start_testing(args: argparse.Namespace):
+    timestamp: str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    print(f"\n🚀 Testing started at {timestamp} for {args.num_episodes} episodes\n")
+    logger: Logger = Logger(
+        log_dir="./test_logs",
+        log_file_name=f"logs_{timestamp}.txt",
+        log_data_file_name=f"log_data_{timestamp}.json",
+        config_file_name=f"config_{timestamp}.json",
+    )
+    logger.load_configs(args.config_path)
+
+    np.random.seed(config.SEED)
+    torch.manual_seed(config.SEED)
+    env: Env = Env()
+    model_name: str = config.MODEL.lower()
+    model: MARLModel = get_model(model_name)
+
+    model.load(args.model_path)
+    print(f"📥 Models loaded successfully from {args.model_path}")
+
+    test_model(env, model, logger, args.num_episodes)
+
+    print("✅ Testing Completed!\n")
+    print("📊 Generating plots...\n")
+    generate_plots(log_file=f"./test_logs/log_data_{timestamp}.json", output_dir="./test_plots/", output_file_prefix="test")
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(dest="mode", required=True)
+    parent_parser = argparse.ArgumentParser(add_help=False)
+    parent_parser.add_argument("--num_episodes", type=int, required=True)
+    train_parser = subparsers.add_parser("train", parents=[parent_parser])
+    train_parser.add_argument("--resume", action="store_true", default=False)
+
+    test_parser = subparsers.add_parser("test", parents=[parent_parser])
+    test_parser.add_argument("--model_path", type=str, required=True)
+    test_parser.add_argument("--config_path", type=str, required=True)
+
+    args = parser.parse_args()
+    if args.mode == "train":
+        start_training(args)
+    elif args.mode == "test":
+        start_testing(args)
+    print("🎉 All done!")

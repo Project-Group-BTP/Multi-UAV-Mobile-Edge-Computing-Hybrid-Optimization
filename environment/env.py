@@ -1,8 +1,11 @@
+# pending
+# scale_actions, apply_actions_to_env
+# add penalty per uav
+
 from environment.user_equipments import UE
 from environment.uavs import UAV
 import config
 import numpy as np
-from typing import List, Tuple
 
 
 class Env:
@@ -11,10 +14,10 @@ class Env:
         UE.initialize_ue_class()
         self.reset()
 
-    def reset(self) -> List[np.ndarray]:
+    def reset(self) -> list[np.ndarray]:
         """Resets the environment to an initial state and returns the initial observations."""
-        self._ues: List[UE] = [UE(i) for i in range(config.NUM_UES)]
-        self._uavs: List[UAV] = [UAV(i) for i in range(config.NUM_UAVS)]
+        self._ues: list[UE] = [UE(i) for i in range(config.NUM_UES)]
+        self._uavs: list[UAV] = [UAV(i) for i in range(config.NUM_UAVS)]
         self._time_step: int = 0
 
         # Set initial requested files and collaborators for observation
@@ -22,7 +25,7 @@ class Env:
             uav.set_current_requested_files(self._ues)
             uav.select_collaborator(uav.get_neighbors(self._uavs))
 
-        return self.get_obs()
+        return self._get_obs()
 
     @property
     def time_step(self) -> int:
@@ -31,25 +34,25 @@ class Env:
 
     # Temporary properties, can be removed later if not needed
     @property
-    def uavs(self) -> List[UAV]:
+    def uavs(self) -> list[UAV]:
         return self._uavs
 
     @property
-    def ues(self) -> List[UE]:
+    def ues(self) -> list[UE]:
         return self._ues
 
-    def _update_positions(self, actions: List[np.ndarray]) -> None:
+    def _update_positions(self, actions: np.ndarray) -> None:
         """Update positions of UAVs and UEs."""
         for uav, action in zip(self._uavs, actions):
             uav.update_position(action[:2])
         for ue in self._ues:
             ue.update_position()
 
-    def step(self, actions: List[np.ndarray]) -> Tuple[List[np.ndarray], float, bool]:
+    def step(self, actions: np.ndarray) -> tuple[list[np.ndarray], list[float], tuple[float, float, float]]:
         """
         Execute one time step of the simulation.
         Returns:
-            A tuple of (next_observations, reward, done_flag).
+            A tuple of (next_observations, rewards, done_flag).
         """
         for uav in self._uavs:
             uav.reset_for_time_slot()
@@ -81,17 +84,15 @@ class Env:
             for uav in self._uavs:
                 uav.gdsf_cache_update()
 
-        obs = self.get_obs()
-        reward = self.get_reward()
-        done = self._time_step >= config.MAX_STEPS
+        obs: list[np.ndarray] = self._get_obs()
+        rewards, metrics = self._get_rewards_and_metrics()
+        return obs, rewards, metrics
 
-        return obs, reward, done
-
-    def get_obs(self) -> List[np.ndarray]:
+    def _get_obs(self) -> list[np.ndarray]:
         """
         Gets the local observation for each UAV agent.
         """
-        all_obs: List[np.ndarray] = []
+        all_obs: list[np.ndarray] = []
         for uav in self._uavs:
             # 1. Own Position (normalized)
             own_pos_obs = uav.pos[:2] / np.array([config.AREA_WIDTH, config.AREA_HEIGHT])
@@ -121,14 +122,14 @@ class Env:
             all_obs.append(obs)
 
         # Determine and set the observation dimension in the config if not already set
-        if not hasattr(config, "OBS_DIM_SINGLE"):
-            config.OBS_DIM_SINGLE = len(all_obs[0])
-            config.STATE_DIM = config.NUM_UAVS * config.OBS_DIM_SINGLE
+        # if not hasattr(config, "OBS_DIM_SINGLE"):
+        #     config.OBS_DIM_SINGLE = len(all_obs[0])
+        #     config.STATE_DIM = config.NUM_UAVS * config.OBS_DIM_SINGLE
 
         return all_obs
 
-    def get_reward(self) -> float:
-        """Calculates the global reward based on the system state."""
+    def _get_rewards_and_metrics(self) -> tuple[list[float], tuple[float, float, float]]:
+        """Returns the global reward and other metrics."""
         total_latency: float = sum(ue.latency for ue in self._ues)
         total_energy: float = sum(uav.energy for uav in self._uavs)
         sc_metrics: np.ndarray = np.array([ue.service_coverage for ue in self._ues if ue.service_coverage > 0])
@@ -136,4 +137,16 @@ class Env:
         sum_sq_sc: float = np.sum(sc_metrics**2)
         jfi: float = (sum_sc**2) / (len(sc_metrics) * sum_sq_sc) if len(sc_metrics) > 0 and sum_sq_sc > 0 else 0.0
         reward: float = -(config.ALPHA_1 * total_latency + config.ALPHA_2 * total_energy - config.ALPHA_3 * jfi)
-        return reward
+        rewards = [reward] * config.NUM_UAVS
+        self._apply_penalties(rewards)
+        return rewards, (total_latency, total_energy, jfi)
+
+    def _apply_penalties(self, rewards: list[float]) -> None:
+        """Applies penalties to the rewards based on certain conditions."""
+        pass
+        # for i, reward in enumerate(rewards):
+        #     if self._ues[i].latency > config.LATENCY_THRESHOLD:
+        #         rewards[i] -= config.LATENCY_PENALTY
+        #     if self._uavs[i].energy > config.ENERGY_THRESHOLD:
+        #         rewards[i] -= config.ENERGY_PENALTY
+        # return rewards

@@ -4,12 +4,11 @@ from environment.env import Env
 import config
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
-from typing import Optional, List
 import numpy as np
 import os
 
 
-def plot_snapshot(env: Env, time_step: int, save_path: Optional[str] = None) -> None:
+def plot_snapshot(env: Env, time_step: int, save_path: str | None = None) -> None:
     """Generates and saves a plot of the current environment state."""
     fig, ax = plt.subplots(figsize=(12, 12))
     ax.set_xlim(0, config.AREA_WIDTH)
@@ -52,14 +51,14 @@ def plot_snapshot(env: Env, time_step: int, save_path: Optional[str] = None) -> 
     plt.close(fig)  # Close the figure to free up memory
 
 
-def generate_random_actions(env: Env, max_retries: int = 20) -> List[np.ndarray]:
+def generate_random_actions(env: Env, max_retries: int = 20) -> list[np.ndarray]:
     """
     Generates a valid random action for each UAV, now with collision avoidance.
     It sequentially generates an action for each UAV, ensuring the new position
     respects the minimum separation distance from other UAVs' new positions.
     """
-    actions: List[np.ndarray] = []
-    new_positions: List[np.ndarray] = []  # Store the intended new (x, y) positions of UAVs
+    actions: list[np.ndarray] = []
+    new_positions: list[np.ndarray] = []  # Store the intended new (x, y) positions of UAVs
     max_dist: float = config.UAV_SPEED * config.TIME_SLOT_DURATION
 
     for uav in env.uavs:
@@ -112,10 +111,10 @@ def main() -> None:
     print("Starting simulation with random actions (with collision avoidance)...")
 
     # Run the simulation for a set number of time slots
-    for t in range(config.SIM_TIME_SLOTS):
+    for t in range(config.STEPS_PER_EPISODE):
         # 1. Generate random actions for each UAV
-        actions: List[np.ndarray] = generate_random_actions(env)
-
+        actions_raw: list[np.ndarray] = generate_random_actions(env)
+        actions: np.ndarray = np.array(actions_raw)
         # 2. Step the environment forward
         env.step(actions)
 

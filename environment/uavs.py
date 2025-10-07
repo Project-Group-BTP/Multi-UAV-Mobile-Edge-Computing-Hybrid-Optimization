@@ -1,22 +1,22 @@
+from __future__ import annotations
 from environment.user_equipments import UE
 from environment import comm_model as comms
 import config
 import numpy as np
-from typing import List, Optional, Tuple
 
 
-def _get_computing_latency_and_energy(uav: "UAV", cpu_cycles: int) -> Tuple[float, float]:
+def _get_computing_latency_and_energy(uav: UAV, cpu_cycles: int) -> tuple[float, float]:
     """Calculate computing latency and energy for a UAV processing request."""
     assert uav._current_service_request_count != 0
-    computing_capacity_per_request = config.UAV_COMPUTING_CAPACITY[uav.id] / uav._current_service_request_count
-    latency = cpu_cycles / computing_capacity_per_request
-    energy = config.K_CPU * cpu_cycles * (computing_capacity_per_request**2)
+    computing_capacity_per_request: float = config.UAV_COMPUTING_CAPACITY[uav.id] / uav._current_service_request_count
+    latency: float = cpu_cycles / computing_capacity_per_request
+    energy: float = config.K_CPU * cpu_cycles * (computing_capacity_per_request**2)
     return latency, energy
 
 
-def _try_add_file_to_cache(uav: "UAV", file_id: int) -> None:
+def _try_add_file_to_cache(uav: UAV, file_id: int) -> None:
     """Try to add a file to UAV cache if there's enough space."""
-    used_space = np.sum(uav._working_cache * config.FILE_SIZES)
+    used_space: int = np.sum(uav._working_cache * config.FILE_SIZES)
     if used_space + config.FILE_SIZES[file_id] <= config.UAV_STORAGE_CAPACITY[uav.id]:
         uav._working_cache[file_id] = True
 
@@ -27,8 +27,8 @@ class UAV:
         self.pos: np.ndarray = np.array([np.random.uniform(0, config.AREA_WIDTH), np.random.uniform(0, config.AREA_HEIGHT), config.UAV_ALTITUDE])
 
         self._dist_moved: float = 0.0  # Distance moved in the current time slot
-        self._current_covered_ues: List[UE] = []
-        self._current_collaborator: Optional["UAV"] = None
+        self._current_covered_ues: list[UE] = []
+        self._current_collaborator: UAV | None = None
         self._current_service_request_count: int = 0
         self._energy_current_slot: float = 0.0  # Energy consumed for this time slot
 
@@ -49,11 +49,11 @@ class UAV:
 
     # Temporary properties, can be removed later if not needed
     @property
-    def current_covered_ues(self) -> List[UE]:
+    def current_covered_ues(self) -> list[UE]:
         return self._current_covered_ues
 
     @property
-    def current_collaborator(self) -> Optional["UAV"]:
+    def current_collaborator(self) -> UAV | None:
         return self._current_collaborator
 
     def reset_for_time_slot(self) -> None:
@@ -67,13 +67,13 @@ class UAV:
 
     def update_position(self, next_pos: np.ndarray) -> None:
         """Update the UAV's position to the new location chosen by the MARL agent."""
-        new_pos = np.append(next_pos, config.UAV_ALTITUDE)
+        new_pos: np.ndarray = np.append(next_pos, config.UAV_ALTITUDE)
         self._dist_moved = float(np.linalg.norm(new_pos - self.pos))
         self.pos = new_pos
 
-    def get_neighbors(self, all_uavs: List["UAV"]) -> List["UAV"]:
+    def get_neighbors(self, all_uavs: list[UAV]) -> list[UAV]:
         """Get neighboring UAVs within sensing range for this UAV."""
-        neighbors: List["UAV"] = []
+        neighbors: list[UAV] = []
         for other_uav in all_uavs:
             if other_uav.id != self.id:
                 distance = float(np.linalg.norm(self.pos - other_uav.pos))
@@ -81,7 +81,7 @@ class UAV:
                     neighbors.append(other_uav)
         return neighbors
 
-    def set_current_requested_files(self, ues: List[UE]) -> None:
+    def set_current_requested_files(self, ues: list[UE]) -> None:
         """Update the current requested files based on the UEs covered by this UAV."""
         self._set_covered_ues(ues)
         for ue in self._current_covered_ues:
@@ -89,18 +89,18 @@ class UAV:
                 _, _, req_id = ue.current_request
                 self._current_requested_files[req_id] = True
 
-    def select_collaborator(self, neighbors: List["UAV"]) -> None:
+    def select_collaborator(self, neighbors: list[UAV]) -> None:
         """Choose a single collaborating UAV from the list of neighbours."""
         if not neighbors:
             self._set_rates()
             return
 
-        best_collaborators: List["UAV"] = []
+        best_collaborators: list[UAV] = []
         max_overlap: int = -1
 
         # Find neighbors with maximum overlap
         for neighbor in neighbors:
-            overlap = int(np.sum(self._current_requested_files & neighbor.cache))
+            overlap: int = int(np.sum(self._current_requested_files & neighbor.cache))
             if overlap > max_overlap:
                 max_overlap = overlap
                 best_collaborators = [neighbor]
@@ -115,10 +115,10 @@ class UAV:
 
         # If tie in overlap, select closest one(s)
         min_distance: float = float("inf")
-        closest_collaborators: List["UAV"] = []
+        closest_collaborators: list[UAV] = []
 
         for collaborator in best_collaborators:
-            distance = float(np.linalg.norm(self.pos - collaborator.pos))
+            distance: float = float(np.linalg.norm(self.pos - collaborator.pos))
 
             if distance < min_distance:
                 min_distance = distance
@@ -158,7 +158,7 @@ class UAV:
             else:  # Content Request
                 self._process_content_request(ue, ue_uav_rate)
 
-    def _set_covered_ues(self, ues: List[UE]) -> None:
+    def _set_covered_ues(self, ues: list[UE]) -> None:
         """Set the list of UEs covered by this UAV."""
         self._current_covered_ues = [ue for ue in ues if np.linalg.norm(self.pos[:2] - ue.pos[:2]) <= config.UAV_COVERAGE_RADIUS]
 

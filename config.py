@@ -1,15 +1,18 @@
+# pending
+# obs_dim_single, really??
+# really??
+
 import numpy as np
 
 # Training Parameters
-NUM_EPISODES: int = 500
-MODEL: str = "mappo"  # Options: 'maddpg', 'matd3', 'mappo', 'random', 'greedy'
-SAVE_FREQ = NUM_EPISODES // 10
-if NUM_EPISODES < 1000:
-    SAVE_FREQ = 100
+MODEL: str = "mappo"  # Options: 'maddpg', 'matd3', 'mappo', 'masac', 'random'
+SEED: int = 1234
 BATCH_SIZE: int = 32
 STEPS_PER_EPISODE: int = 1000  # Total T
 LOG_FREQ: int = 10
-IMG_FREQ: int = 100  # save image every 100 episodes
+IMG_FREQ: int = 100
+TEST_LOG_FREQ: int = 1
+TEST_IMG_FREQ: int = 1
 LEARN_FREQ: int = 5  # learn every 5 steps
 
 RESUME_DIRECTORY: str = ""  # path to saved model directory to resume training from
@@ -68,11 +71,13 @@ assert ALPHA_1 + ALPHA_2 + ALPHA_3 == 1.0
 
 # Model Parameters
 
-OBS_DIM: int = 5
+OBS_DIM_SINGLE: int = 5
 ACTION_DIM: int = 2
+STATE_DIM: int = NUM_UAVS * OBS_DIM_SINGLE
 MLP_HIDDEN_DIM: int = 160
 
-LEARNING_RATE: float = 0.001  # alpha
+ACTOR_LR: float = 0.002
+CRITIC_LR: float = 0.001
 DISCOUNT_FACTOR: float = 0.99  # gamma
 UPDATE_FACTOR: float = 0.01  # tau
 
@@ -100,25 +105,23 @@ TARGET_POLICY_NOISE = 0.2
 NOISE_CLIP = 0.5
 
 # --- MAPPO Specific Hyperparameters ---
-LOG_STD_MAX = 2
-LOG_STD_MIN = -20
-# Learning rates for the Actor and Critic networks
-PPO_ACTOR_LR = 3e-4
-PPO_CRITIC_LR = 1e-3
 
-# The number of training epochs to run on the collected rollout data
-PPO_EPOCHS = 10
+# On-policy collection parameters
+PPO_ROLLOUT_LENGTH = 2048  # Number of steps to collect per rollout before updating
 
-# The size of mini-batches to use during the PPO update step
-PPO_MINIBATCH_SIZE = 64
+# GAE (Generalized Advantage Estimation) parameters
+PPO_GAE_LAMBDA = 0.95  # Lambda parameter for GAE
 
-# The clipping parameter (epsilon) for the PPO surrogate objective function
-PPO_CLIP_EPS = 0.2
+# Neural Network parameters
+LOG_STD_MAX = 2  # Maximum log standard deviation for the actor's policy
+LOG_STD_MIN = -20  # Minimum log standard deviation for the actor's policy
 
-# The coefficient for the entropy bonus, encouraging exploration
-PPO_ENTROPY_COEF = 0.01
+# PPO Update parameters
+PPO_EPOCHS = 10  # Number of epochs to run on the collected rollout data
+PPO_BATCH_SIZE = 64  # The size of mini-batches to use during the update step
+PPO_CLIP_EPS = 0.2  # The clipping parameter (epsilon) for the PPO surrogate objective
+PPO_ENTROPY_COEF = 0.01  # Coefficient for the entropy bonus to encourage exploration
+PPO_MAX_GRAD_NORM = 0.5  # Maximum norm for gradient clipping to prevent exploding gradients
 
-# The coefficient for the value function loss in the total loss calculation
-PPO_VALUE_COEF = 0.5
-
-PPO_MAX_GRAD_NORM = 0.5  # for gradient clipping
+# --- MASAC Specific Hyperparameters ---
+ALPHA_LR = 3e-4  # Learning rate for the entropy temperature alpha
