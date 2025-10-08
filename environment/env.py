@@ -32,7 +32,6 @@ class Env:
         """Get current time step."""
         return self._time_step
 
-    # Temporary properties, can be removed later if not needed
     @property
     def uavs(self) -> list[UAV]:
         return self._uavs
@@ -56,9 +55,11 @@ class Env:
         """
         for uav in self._uavs:
             uav.reset_for_time_slot()
-
         self._time_step += 1
-        self._update_positions(actions)
+
+        scaled_actions = self._scale_actions(actions)
+        # self._apply_actions_to_env(scaled_actions)
+        # self._update_positions(scaled_actions)
 
         for ue in self._ues:
             ue.generate_request()
@@ -84,9 +85,9 @@ class Env:
             for uav in self._uavs:
                 uav.gdsf_cache_update()
 
-        obs: list[np.ndarray] = self._get_obs()
+        next_obs: list[np.ndarray] = self._get_obs()
         rewards, metrics = self._get_rewards_and_metrics()
-        return obs, rewards, metrics
+        return next_obs, rewards, metrics
 
     def _get_obs(self) -> list[np.ndarray]:
         """
@@ -127,6 +128,49 @@ class Env:
         #     config.STATE_DIM = config.NUM_UAVS * config.OBS_DIM_SINGLE
 
         return all_obs
+    
+    def _scale_actions(self, actions: np.ndarray) -> list[np.ndarray]:
+        """
+        Scales the actions from the actor's output range [-1, 1] to the environment's
+        expected range [0, AREA_WIDTH] and [0, AREA_HEIGHT].
+        This also enforces the max speed constraint.
+        """
+        scaled_actions = []
+        # This assumes a fixed uav_speed for all UAVs, which is the case in our config
+        max_dist = config.UAV_SPEED * config.TIME_SLOT_DURATION
+
+        for action in actions:
+            # Action is expected to be [delta_x, delta_y] in range [-1, 1]
+            # We scale this to represent a vector of movement
+            move_vec = action * max_dist
+            scaled_actions.append(move_vec)
+
+        return scaled_actions
+
+    def _apply_actions_to_env(self, unscaled_actions: np.ndarray) -> list[np.ndarray]:
+        """
+        Applies the scaled actions to the environment state to get the next positions.
+        This function respects the area boundaries.
+        """
+        current_positions = np.array([uav.pos[:2] for uav in self._uavs])
+        scaled_moves = self._scale_actions(unscaled_actions)
+
+        next_positions = current_positions + scaled_moves
+
+        # Clip to ensure UAVs stay within the area boundaries
+        next_positions[:, 0] = np.clip(next_positions[:, 0], 0, config.AREA_WIDTH)
+        next_positions[:, 1] = np.clip(next_positions[:, 1], 0, config.AREA_HEIGHT)
+
+        # Simple collision avoidance: if too close, don't move. A more sophisticated
+        # method could be used, but this is a start.
+        for i in range(len(next_positions)):
+            for j in range(i + 1, len(next_positions)):
+                if np.linalg.norm(next_positions[i] - next_positions[j]) < config.MIN_UAV_SEPARATION:
+                    # On collision, revert the second UAV to its original position
+                    next_positions[j] = current_positions[j]
+
+        return [pos for pos in next_positions]
+
 
     def _get_rewards_and_metrics(self) -> tuple[list[float], tuple[float, float, float]]:
         """Returns the global reward and other metrics."""

@@ -1,6 +1,7 @@
 # pending
+# obs_dim_single, really??
+# really??
 # list : train, env, config
-# remove properties from uavs.py
 # fix requirements.txt
 # complete readme and gitignore
 # remove untracked files and main.py, but add idea.md
@@ -118,7 +119,7 @@ def train_off_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: i
             buffer.add(obs, actions, rewards, next_obs, done)
 
             if total_step_count > config.INITIAL_RANDOM_STEPS and step % config.LEARN_FREQ == 0 and len(buffer) > config.BATCH_SIZE:
-                batch = buffer.sample(config.BATCH_SIZE)
+                batch = buffer.sample(config.REPLAY_BATCH_SIZE)
                 model.update(batch)
 
             obs = next_obs

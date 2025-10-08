@@ -1,19 +1,14 @@
-# pending
-# obs_dim_single, really??
-# really??
-
 import numpy as np
 
 # Training Parameters
-MODEL: str = "mappo"  # Options: 'maddpg', 'matd3', 'mappo', 'masac', 'random'
-SEED: int = 1234
-BATCH_SIZE: int = 32
-STEPS_PER_EPISODE: int = 1000  # Total T
-LOG_FREQ: int = 10
-IMG_FREQ: int = 100
-TEST_LOG_FREQ: int = 1
-TEST_IMG_FREQ: int = 1
-LEARN_FREQ: int = 5  # learn every 5 steps
+MODEL: str = "mappo"  # options: 'maddpg', 'matd3', 'mappo', 'masac', 'random'
+SEED: int = 1234  # random seed for reproducibility
+STEPS_PER_EPISODE: int = 1000  # total T
+LOG_FREQ: int = 10  # episodes
+IMG_FREQ: int = 100  # episodes
+TEST_LOG_FREQ: int = 1  # episodes (for testing)
+TEST_IMG_FREQ: int = 1  # episodes (for testing)
+LEARN_FREQ: int = 5  # steps
 
 RESUME_DIRECTORY: str = ""  # path to saved model directory to resume training from
 
@@ -62,14 +57,12 @@ BANDWIDTH_INTER: int = 20 * 10**6  # B^inter in Hz
 BANDWIDTH_EDGE: int = 20 * 10**6  # B^edge in Hz
 BANDWIDTH_BACKHAUL: int = 50 * 10**6  # B^backhaul in Hz
 
-# -- MARL Parameters --
+# Model Parameters
 
 ALPHA_1 = 0.4  # for latency
 ALPHA_2 = 0.4  # for energy
 ALPHA_3 = 0.2  # for fairness
-assert ALPHA_1 + ALPHA_2 + ALPHA_3 == 1.0
-
-# Model Parameters
+assert round(ALPHA_1 + ALPHA_2 + ALPHA_3, 3) == 1.0
 
 OBS_DIM_SINGLE: int = 5
 ACTION_DIM: int = 2
@@ -80,48 +73,33 @@ ACTOR_LR: float = 0.002
 CRITIC_LR: float = 0.001
 DISCOUNT_FACTOR: float = 0.99  # gamma
 UPDATE_FACTOR: float = 0.01  # tau
+MAX_GRAD_NORM: float = 0.5  # maximum norm for gradient clipping to prevent exploding gradients
+LOG_STD_MAX: float = 2  # maximum log standard deviation for stochastic policies
+LOG_STD_MIN: float = -20  # minimum log standard deviation for stochastic policies
+EPSILON: float = 1e-9  # small value to prevent division by zero
 
-# MADDPG Specific Hyperparameters
+# Off-policy algorithm hyperparameters
 REPLAY_BUFFER_SIZE: int = 1_000_000  # B
-MAX_GRAD_NORM: float = 1.0  # for gradient clipping
+REPLAY_BATCH_SIZE: int = 32  # minibatch size
 INITIAL_RANDOM_STEPS: int = 10  # steps of random actions for exploration
 
-
-EPSILON: float = 1e-9
-
-# Gaussian Noise Parameters
+# Gaussian Noise Parameters (for MADDPG and MATD3)
 INITIAL_NOISE_SCALE: float = 1.0
 MIN_NOISE_SCALE: float = 0.1
 NOISE_DECAY_RATE: float = 0.995
 
-# --- MATD3 Specific Hyperparameters ---
-# The 'd' parameter from the paper: update policy and targets every 'd' critic updates.
-POLICY_UPDATE_FREQ = 2
+# MATD3 Specific Hyperparameters
+POLICY_UPDATE_FREQ = 2  # delayed policy update frequency
+TARGET_POLICY_NOISE = 0.2  # standard deviation of target policy smoothing noise.
+NOISE_CLIP = 0.5  # range to clip target policy smoothing noise
 
-# The standard deviation 'sigma' for the noise added to target policy actions.
-TARGET_POLICY_NOISE = 0.2
+# MAPPO Specific Hyperparameters
+PPO_ROLLOUT_LENGTH: int = 2048  # number of steps to collect per rollout before updating
+PPO_GAE_LAMBDA: float = 0.95  # lambda parameter for GAE
+PPO_EPOCHS: int = 10  # number of epochs to run on the collected rollout data
+PPO_BATCH_SIZE: int = 64  # size of mini-batches to use during the update step
+PPO_CLIP_EPS: float = 0.2  # clipping parameter (epsilon) for the PPO surrogate objective
+PPO_ENTROPY_COEF: float = 0.01  # coefficient for the entropy bonus to encourage exploration
 
-# The clipping value 'c' for the target policy noise.
-NOISE_CLIP = 0.5
-
-# --- MAPPO Specific Hyperparameters ---
-
-# On-policy collection parameters
-PPO_ROLLOUT_LENGTH = 2048  # Number of steps to collect per rollout before updating
-
-# GAE (Generalized Advantage Estimation) parameters
-PPO_GAE_LAMBDA = 0.95  # Lambda parameter for GAE
-
-# Neural Network parameters
-LOG_STD_MAX = 2  # Maximum log standard deviation for the actor's policy
-LOG_STD_MIN = -20  # Minimum log standard deviation for the actor's policy
-
-# PPO Update parameters
-PPO_EPOCHS = 10  # Number of epochs to run on the collected rollout data
-PPO_BATCH_SIZE = 64  # The size of mini-batches to use during the update step
-PPO_CLIP_EPS = 0.2  # The clipping parameter (epsilon) for the PPO surrogate objective
-PPO_ENTROPY_COEF = 0.01  # Coefficient for the entropy bonus to encourage exploration
-PPO_MAX_GRAD_NORM = 0.5  # Maximum norm for gradient clipping to prevent exploding gradients
-
-# --- MASAC Specific Hyperparameters ---
-ALPHA_LR = 3e-4  # Learning rate for the entropy temperature alpha
+# MASAC Specific Hyperparameters
+ALPHA_LR: float = 3e-4  # learning rate for the entropy temperature alpha

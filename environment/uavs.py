@@ -47,7 +47,6 @@ class UAV:
     def energy(self) -> float:
         return self._energy_current_slot
 
-    # Temporary properties, can be removed later if not needed
     @property
     def current_covered_ues(self) -> list[UE]:
         return self._current_covered_ues

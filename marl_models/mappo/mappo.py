@@ -87,13 +87,13 @@ class MAPPO(MARLModel):
         # Update Actor
         self.actor_optimizer.zero_grad()
         actor_loss.backward()
-        torch.nn.utils.clip_grad_norm_(self.actors.parameters(), config.PPO_MAX_GRAD_NORM)
+        torch.nn.utils.clip_grad_norm_(self.actors.parameters(), config.MAX_GRAD_NORM)
         self.actor_optimizer.step()
 
         # Update Critic
         self.critic_optimizer.zero_grad()
         critic_loss.backward()
-        torch.nn.utils.clip_grad_norm_(self.critics.parameters(), config.PPO_MAX_GRAD_NORM)
+        torch.nn.utils.clip_grad_norm_(self.critics.parameters(), config.MAX_GRAD_NORM)
         self.critic_optimizer.step()
 
     def reset(self) -> None:
