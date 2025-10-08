@@ -28,6 +28,7 @@ class UAV:
 
         self._dist_moved: float = 0.0  # Distance moved in the current time slot
         self._current_covered_ues: list[UE] = []
+        self._neighbors: list[UAV] = []
         self._current_collaborator: UAV | None = None
         self._current_service_request_count: int = 0
         self._energy_current_slot: float = 0.0  # Energy consumed for this time slot
@@ -52,12 +53,17 @@ class UAV:
         return self._current_covered_ues
 
     @property
+    def neighbors(self) -> list[UAV]:
+        return self._neighbors
+
+    @property
     def current_collaborator(self) -> UAV | None:
         return self._current_collaborator
 
-    def reset_for_time_slot(self) -> None:
-        """Reset UAV state for a new time slot."""
+    def reset_for_next_step(self) -> None:
+        """Reset UAV state for a new step."""
         self._current_covered_ues = []
+        self._neighbors = []
         self._current_collaborator = None
         self._current_service_request_count = 0
         self._current_requested_files = np.zeros(config.NUM_FILES, dtype=bool)
@@ -70,15 +76,14 @@ class UAV:
         self._dist_moved = float(np.linalg.norm(new_pos - self.pos))
         self.pos = new_pos
 
-    def get_neighbors(self, all_uavs: list[UAV]) -> list[UAV]:
-        """Get neighboring UAVs within sensing range for this UAV."""
-        neighbors: list[UAV] = []
+    def set_neighbors(self, all_uavs: list[UAV]) -> None:
+        """Set neighboring UAVs within sensing range for this UAV."""
+        self._neighbors = []
         for other_uav in all_uavs:
             if other_uav.id != self.id:
                 distance = float(np.linalg.norm(self.pos - other_uav.pos))
                 if distance <= config.UAV_SENSING_RANGE:
-                    neighbors.append(other_uav)
-        return neighbors
+                    self._neighbors.append(other_uav)
 
     def set_current_requested_files(self, ues: list[UE]) -> None:
         """Update the current requested files based on the UEs covered by this UAV."""
@@ -88,9 +93,9 @@ class UAV:
                 _, _, req_id = ue.current_request
                 self._current_requested_files[req_id] = True
 
-    def select_collaborator(self, neighbors: list[UAV]) -> None:
-        """Choose a single collaborating UAV from the list of neighbours."""
-        if not neighbors:
+    def select_collaborator(self) -> None:
+        """Choose a single collaborating UAV from its list of neighbours."""
+        if not self._neighbors:
             self._set_rates()
             return
 
@@ -98,7 +103,7 @@ class UAV:
         max_overlap: int = -1
 
         # Find neighbors with maximum overlap
-        for neighbor in neighbors:
+        for neighbor in self._neighbors:
             overlap: int = int(np.sum(self._current_requested_files & neighbor.cache))
             if overlap > max_overlap:
                 max_overlap = overlap

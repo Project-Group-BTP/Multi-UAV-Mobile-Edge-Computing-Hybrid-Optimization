@@ -89,9 +89,9 @@ MIN_NOISE_SCALE: float = 0.1
 NOISE_DECAY_RATE: float = 0.995
 
 # MATD3 Specific Hyperparameters
-POLICY_UPDATE_FREQ = 2  # delayed policy update frequency
-TARGET_POLICY_NOISE = 0.2  # standard deviation of target policy smoothing noise.
-NOISE_CLIP = 0.5  # range to clip target policy smoothing noise
+POLICY_UPDATE_FREQ: int = 2  # delayed policy update frequency
+TARGET_POLICY_NOISE: float = 0.2  # standard deviation of target policy smoothing noise.
+NOISE_CLIP: float = 0.5  # range to clip target policy smoothing noise
 
 # MAPPO Specific Hyperparameters
 PPO_ROLLOUT_LENGTH: int = 2048  # number of steps to collect per rollout before updating

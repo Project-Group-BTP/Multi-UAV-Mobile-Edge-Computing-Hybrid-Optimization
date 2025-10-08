@@ -1,13 +1,3 @@
-# pending
-# obs_dim_single, really??
-# really??
-# list : train, env, config
-# fix requirements.txt
-# complete readme and gitignore
-# remove untracked files and main.py, but add idea.md
-# obs_dim_single, really??
-# add in readme : With Modern python practices and type annotations (python 3.10+), use 3.13 python pls.
-
 from marl_models.base_model import MARLModel
 from marl_models.buffer import RolloutBuffer, ReplayBuffer
 from marl_models.utils import save_models
@@ -32,8 +22,8 @@ def train_on_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: in
     rollout_log: Log = Log()
 
     for update in range(1, num_updates + 1):
-        obs = env.reset()
-        state = np.concatenate(obs, axis=0)
+        obs: list[np.ndarray] = env.reset()
+        state: np.ndarray = np.concatenate(obs, axis=0)
         rollout_reward: float = 0.0
         rollout_latency: float = 0.0
         rollout_energy: float = 0.0
@@ -45,16 +35,13 @@ def train_on_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: in
                 plot_snapshot(env, update, step, logger.log_dir, "update")
 
             total_step_count += 1
-            obs_arr = np.array(obs)
+            obs_arr: np.ndarray = np.array(obs)
             actions, log_probs, value = model.get_action_and_value(obs_arr, state)
 
             next_obs, rewards, (total_latency, total_energy, jfi) = env.step(actions)
+            next_state: np.ndarray = np.concatenate(next_obs, axis=0)
             done: bool = step >= config.PPO_ROLLOUT_LENGTH
-            rewards_arr = np.array(rewards)
-            next_state = np.concatenate(next_obs, axis=0)
-            dones_arr = np.array([done] * config.NUM_UAVS)
-            values_arr = np.array([value] * config.NUM_UAVS)
-            buffer.add(state, obs_arr, actions, log_probs, rewards_arr, dones_arr, values_arr)
+            buffer.add(state, obs_arr, actions, log_probs, rewards, done, value)
 
             obs = next_obs
             state = next_state
@@ -66,7 +53,7 @@ def train_on_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: in
 
         with torch.no_grad():
             _, _, last_value = model.get_action_and_value(np.array(obs), state)
-            last_values_arr = np.array([last_value] * config.NUM_UAVS)
+            last_values_arr: np.ndarray = np.array([last_value] * config.NUM_UAVS)
 
         buffer.compute_returns_and_advantages(last_values_arr, config.DISCOUNT_FACTOR, config.PPO_GAE_LAMBDA)
 
@@ -118,7 +105,7 @@ def train_off_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: i
             done: bool = step >= config.STEPS_PER_EPISODE
             buffer.add(obs, actions, rewards, next_obs, done)
 
-            if total_step_count > config.INITIAL_RANDOM_STEPS and step % config.LEARN_FREQ == 0 and len(buffer) > config.BATCH_SIZE:
+            if total_step_count > config.INITIAL_RANDOM_STEPS and step % config.LEARN_FREQ == 0 and len(buffer) > config.REPLAY_BATCH_SIZE:
                 batch = buffer.sample(config.REPLAY_BATCH_SIZE)
                 model.update(batch)
 

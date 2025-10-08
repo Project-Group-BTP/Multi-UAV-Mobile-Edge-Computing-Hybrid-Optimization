@@ -53,15 +53,16 @@ class RolloutBuffer:
 
         self.step: int = 0
 
-    def add(self, state: np.ndarray, obs: np.ndarray, actions: np.ndarray, log_probs: np.ndarray, rewards: np.ndarray, dones: np.ndarray, values: np.ndarray) -> None:
+    def add(self, state: np.ndarray, obs: np.ndarray, actions: np.ndarray, log_probs: np.ndarray, rewards: list[float], done: bool, value: np.ndarray) -> None:
         if self.step >= self.buffer_size:
             raise ValueError("Rollout buffer overflow")
-
+        dones: np.ndarray = np.array([done] * config.NUM_UAVS)
+        values: np.ndarray = np.array([value] * config.NUM_UAVS)
         self.states[self.step] = state
         self.observations[self.step] = obs
         self.actions[self.step] = actions
         self.log_probs[self.step] = log_probs
-        self.rewards[self.step] = rewards
+        self.rewards[self.step] = np.array(rewards)
         self.dones[self.step] = dones
         self.values[self.step] = values
 
