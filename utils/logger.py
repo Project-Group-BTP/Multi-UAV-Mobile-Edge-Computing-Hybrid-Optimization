@@ -28,7 +28,7 @@ class Logger:
         self.config_file_path: str = os.path.join(self.log_dir, config_file_name)
 
     def log_configs(self) -> None:
-        config_dict: dict = {key: getattr(default_config, key) for key in dir(default_config) if not key.startswith("__") and not callable(getattr(default_config, key))}
+        config_dict: dict = {key: getattr(default_config, key) for key in dir(default_config) if key.isupper() and not key.startswith("__") and not callable(getattr(default_config, key))}
 
         # Custom serializer for numpy arrays
         def numpy_encoder(obj):

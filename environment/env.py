@@ -1,9 +1,3 @@
-# pending
-# apply_actions_to_env, how to do no overlap??
-# _get_obs, how to form obs, what to include there??
-# obs_dim_single, really, how to calculate it??
-# add penalty per uav
-
 from environment.user_equipments import UE
 from environment.uavs import UAV
 import config
@@ -62,7 +56,7 @@ class Env:
 
         if visualize:
             for uav, action in zip(self._uavs, actions):  # only for visualize script
-                uav.update_position(action[:2])
+                uav.update_position(action)
         else:
             self._apply_actions_to_env(actions)
 
@@ -74,105 +68,106 @@ class Env:
         # For new time step
         for ue in self._ues:
             ue.generate_request()
+        self._associate_ues_to_uavs()
         for uav in self._uavs:
-            uav.set_current_requested_files(self._ues)
+            uav.set_current_requested_files()
             uav.set_neighbors(self._uavs)
-        for uav in self._uavs:
             uav.select_collaborator()
         for uav in self._uavs:
             uav.set_freq_counts()
 
         all_obs: list[np.ndarray] = []
-        # need to capture observations ???
+        for uav in self._uavs:
+            # Part 1: Own state (position and cache status)
+            own_pos: np.ndarray = uav.pos[:2] / np.array([config.AREA_WIDTH, config.AREA_HEIGHT])
+            own_cache: np.ndarray = uav.cache.astype(np.float32)
+            own_state: np.ndarray = np.concatenate([own_pos, own_cache])
+
+            # Part 2: Neighbors state (positions and cache status)
+            neighbor_states: np.ndarray = np.zeros((config.MAX_UAV_NEIGHBORS, 2 + config.NUM_FILES))
+            neighbors: list[UAV] = sorted(uav.neighbors, key=lambda n: float(np.linalg.norm(uav.pos - n.pos)))[: config.MAX_UAV_NEIGHBORS]
+            for i, neighbor in enumerate(neighbors):
+                relative_pos: np.ndarray = (neighbor.pos[:2] - uav.pos[:2]) / config.UAV_SENSING_RANGE
+                neighbor_cache: np.ndarray = neighbor.cache.astype(np.float32)
+                neighbor_states[i, :] = np.concatenate([relative_pos, neighbor_cache])
+
+            # Part 3: State of associated UEs
+            ue_states: np.ndarray = np.zeros((config.MAX_ASSOCIATED_UES, 2 + 3))
+            ues = sorted(uav.current_covered_ues, key=lambda u: float(np.linalg.norm(uav.pos - u.pos)))[: config.MAX_ASSOCIATED_UES]
+            for i, ue in enumerate(ues):
+                relative_pos = (ue.pos[:2] - uav.pos[:2]) / config.UAV_COVERAGE_RADIUS
+                request_info = np.array(ue.current_request, dtype=np.float32)
+                ue_states[i, :] = np.concatenate([relative_pos, request_info])
+
+            # Part 4: Combine all parts into a single, flat observation vector
+            obs: np.ndarray = np.concatenate([own_state, neighbor_states.flatten(), ue_states.flatten()])
+            all_obs.append(obs)
+
         return all_obs
 
-    def _apply_actions_to_env(self, actions_raw: np.ndarray) -> list[np.ndarray]:
-        current_positions = np.array([uav.pos[:2] for uav in self._uavs])
+    def _apply_actions_to_env(self, actions: np.ndarray) -> None:
+        """Calculates next positions and resolves potential collisions iteratively."""
+        current_positions: np.ndarray = np.array([uav.pos[:2] for uav in self._uavs])
         max_dist: float = config.UAV_SPEED * config.TIME_SLOT_DURATION
-        angles: np.ndarray = (actions_raw[:, 0] + 1) * np.pi  # from [-1, 1] to [0, 2π]
-        distances: np.ndarray = (actions_raw[:, 1] + 1) / 2 * max_dist  # from [-1, 1] to [0, max_dist]
+        angles: np.ndarray = (actions[:, 0] + 1) * np.pi  # from [-1, 1] to [0, 2π]
+        distances: np.ndarray = (actions[:, 1] + 1) / 2 * max_dist  # from [-1, 1] to [0, max_dist]
 
-        delta_x: np.ndarray = distances * np.cos(angles)
-        delta_y: np.ndarray = distances * np.sin(angles)
-        actions: np.ndarray = np.stack((delta_x, delta_y), axis=1)
-        next_positions = current_positions + actions
+        delta_pos: np.ndarray = np.stack((distances * np.cos(angles), distances * np.sin(angles)), axis=1)
+        proposed_positions: np.ndarray = current_positions + delta_pos
 
-        #  Penalties
-        # Clip to ensure UAVs stay within the area boundaries
-        next_positions[:, 0] = np.clip(next_positions[:, 0], 0, config.AREA_WIDTH)
-        next_positions[:, 1] = np.clip(next_positions[:, 1], 0, config.AREA_HEIGHT)
-        # ???
-        # Simple collision avoidance: if too close, don't move. A more sophisticated
-        # method could be used, but this is a start.
-        # for i in range(len(next_positions)):
-        #     for j in range(i + 1, len(next_positions)):
-        #         if np.linalg.norm(next_positions[i] - next_positions[j]) < config.MIN_UAV_SEPARATION:
-        #             # On collision, revert the second UAV to its original position
-        #             next_positions[j] = current_positions[j]
+        for i, uav in enumerate(self._uavs):
+            if not (0 <= proposed_positions[i, 0] < config.AREA_WIDTH and 0 <= proposed_positions[i, 1] < config.AREA_HEIGHT):
+                uav.boundary_violation = True
+        next_positions: np.ndarray = np.clip(proposed_positions, 0, [config.AREA_WIDTH, config.AREA_HEIGHT])
 
-        return [pos for pos in next_positions]
+        min_sep_sq: float = config.MIN_UAV_SEPARATION**2
+        for _ in range(config.COLLISION_AVOIDANCE_ITERATIONS + 1):
+            for i in range(config.NUM_UAVS):
+                for j in range(i + 1, config.NUM_UAVS):
+                    pos_i: np.ndarray = next_positions[i]
+                    pos_j: np.ndarray = next_positions[j]
+                    dist_sq: float = np.sum((pos_i - pos_j) ** 2)
+                    if dist_sq < min_sep_sq:
+                        self._uavs[i].collision_violation = True
+                        dist: float = np.sqrt(dist_sq) if dist_sq > 0 else config.EPSILON
+                        overlap: float = config.MIN_UAV_SEPARATION - dist
+                        direction: np.ndarray = (pos_i - pos_j) / dist
+                        next_positions[i] += direction * overlap * 0.5
+                        next_positions[j] -= direction * overlap * 0.5
+
+        final_positions: np.ndarray = np.clip(next_positions, 0, [config.AREA_WIDTH, config.AREA_HEIGHT])
+        for i, uav in enumerate(self._uavs):
+            uav.update_position(final_positions[i])
+
+    def _associate_ues_to_uavs(self) -> None:
+        """Assigns each UE to at most one UAV, resolving overlaps by choosing the closest UAV."""
+        for ue in self._ues:
+            covering_uavs: list[tuple[UAV, float]] = []
+            for uav in self._uavs:
+                distance: float = float(np.linalg.norm(uav.pos[:2] - ue.pos[:2]))
+                if distance <= config.UAV_COVERAGE_RADIUS:
+                    covering_uavs.append((uav, distance))
+
+            if not covering_uavs:
+                continue
+
+            best_uav, _ = min(covering_uavs, key=lambda x: x[1])
+            best_uav.current_covered_ues.append(ue)
 
     def _get_rewards_and_metrics(self) -> tuple[list[float], tuple[float, float, float]]:
-        """Returns the global reward and other metrics."""
+        """Returns the reward and other metrics."""
         total_latency: float = sum(ue.latency for ue in self._ues)
         total_energy: float = sum(uav.energy for uav in self._uavs)
         sc_metrics: np.ndarray = np.array([ue.service_coverage for ue in self._ues if ue.service_coverage > 0])
-        sum_sc: float = np.sum(sc_metrics)
-        sum_sq_sc: float = np.sum(sc_metrics**2)
-        jfi: float = (sum_sc**2) / (len(sc_metrics) * sum_sq_sc) if len(sc_metrics) > 0 and sum_sq_sc > 0 else 0.0
+        jfi: float = 0.0
+        if sc_metrics.size > 0:
+            if np.sum(sc_metrics**2) > 0:
+                jfi = (np.sum(sc_metrics) ** 2) / (sc_metrics.size * np.sum(sc_metrics**2))
         reward: float = -(config.ALPHA_1 * total_latency + config.ALPHA_2 * total_energy - config.ALPHA_3 * jfi)
-        rewards = [reward] * config.NUM_UAVS
-        self._apply_penalties(rewards)
+        rewards: list[float] = [reward] * config.NUM_UAVS
+        for uav in self._uavs:
+            if uav.collision_violation:
+                rewards[uav.id] -= config.COLLISION_PENALTY
+            if uav.boundary_violation:
+                rewards[uav.id] -= config.BOUNDARY_PENALTY
         return rewards, (total_latency, total_energy, jfi)
-
-    def _apply_penalties(self, rewards: list[float]) -> None:
-        """Applies penalties to the rewards based on certain conditions."""
-        pass
-        # for i, reward in enumerate(rewards):
-        #     if self._ues[i].latency > config.LATENCY_THRESHOLD:
-        #         rewards[i] -= config.LATENCY_PENALTY
-        #     if self._uavs[i].energy > config.ENERGY_THRESHOLD:
-        #         rewards[i] -= config.ENERGY_PENALTY
-        # return rewards
-
-    # def _get_obs(self) -> list[np.ndarray]:
-    #     """Gets the local observation for each UAV agent."""
-    #     for ue in self._ues:
-    #         ue.generate_request()
-    #     for uav in self._uavs:
-    #         uav.set_current_requested_files(self._ues)
-
-    #     all_obs: list[np.ndarray] = []
-    #     for uav in self._uavs:
-    #         # 1. Own Position (normalized)
-    #         own_pos_obs: np.ndarray = uav.pos[:2] / np.array([config.AREA_WIDTH, config.AREA_HEIGHT])
-
-    #         # 2. Neighbor Information (positions and cache status)
-    #         neighbor_positions: np.ndarray = np.zeros((config.NUM_UAVS - 1, 2))
-    #         neighbor_caches: np.ndarray = np.zeros((config.NUM_UAVS - 1, config.NUM_FILES))
-
-    #         # Pad with zeros if fewer neighbors than max
-    #         for i, neighbor in enumerate(uav.neighbors):
-    #             assert i < config.NUM_UAVS - 1
-    #             neighbor_positions[i] = neighbor.pos[:2] / np.array([config.AREA_WIDTH, config.AREA_HEIGHT])
-    #             neighbor_caches[i] = neighbor.cache
-
-    #         # 3. Associated UE Information (simplified for fixed-size observation)
-    #         associated_ue_count = len(uav.current_covered_ues)
-    #         total_req_size = sum(ue.current_request[1] for ue in uav.current_covered_ues if ue.current_request)
-    #         ue_info = np.array([associated_ue_count, total_req_size])
-
-    #         # 4. Own Cache Status
-    #         own_cache_obs = uav.cache.astype(np.float32)
-
-    #         # Concatenate all parts to form the final observation vector
-    #         obs = np.concatenate([own_pos_obs, neighbor_positions.flatten(), neighbor_caches.flatten(), ue_info, own_cache_obs]).astype(np.float32)
-
-    #         all_obs.append(obs)
-
-    #     # Determine and set the observation dimension in the config if not already set
-    #     # if not hasattr(config, "OBS_DIM_SINGLE"):
-    #     #     config.OBS_DIM_SINGLE = len(all_obs[0])
-    #     #     config.STATE_DIM = config.NUM_UAVS * config.OBS_DIM_SINGLE
-
-    #     return all_obs

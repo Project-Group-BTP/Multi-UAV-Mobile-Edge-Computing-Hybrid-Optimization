@@ -32,6 +32,8 @@ class UAV:
         self._current_collaborator: UAV | None = None
         self._current_service_request_count: int = 0
         self._energy_current_slot: float = 0.0  # Energy consumed for this time slot
+        self.collision_violation: bool = False  # Track if UAV has violated minimum separation
+        self.boundary_violation: bool = False  # Track if UAV has gone out of bounds
 
         # Cache and request tracking
         self._current_requested_files: np.ndarray = np.zeros(config.NUM_FILES, dtype=bool)
@@ -69,6 +71,8 @@ class UAV:
         self._current_requested_files = np.zeros(config.NUM_FILES, dtype=bool)
         self._freq_counts = np.zeros(config.NUM_FILES)
         self._energy_current_slot = 0.0
+        self.collision_violation = False
+        self.boundary_violation = False
 
     def update_position(self, next_pos: np.ndarray) -> None:
         """Update the UAV's position to the new location chosen by the MARL agent."""
@@ -85,9 +89,8 @@ class UAV:
                 if distance <= config.UAV_SENSING_RANGE:
                     self._neighbors.append(other_uav)
 
-    def set_current_requested_files(self, ues: list[UE]) -> None:
+    def set_current_requested_files(self) -> None:
         """Update the current requested files based on the UEs covered by this UAV."""
-        self._set_covered_ues(ues)
         for ue in self._current_covered_ues:
             if ue.current_request:
                 _, _, req_id = ue.current_request
@@ -161,10 +164,6 @@ class UAV:
                 self._process_service_request(ue, ue_uav_rate)
             else:  # Content Request
                 self._process_content_request(ue, ue_uav_rate)
-
-    def _set_covered_ues(self, ues: list[UE]) -> None:
-        """Set the list of UEs covered by this UAV."""
-        self._current_covered_ues = [ue for ue in ues if np.linalg.norm(self.pos[:2] - ue.pos[:2]) <= config.UAV_COVERAGE_RADIUS]
 
     def _set_rates(self) -> None:
         """Set communication rates for UAV-MBS and UAV-UAV links."""

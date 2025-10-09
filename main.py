@@ -1,7 +1,7 @@
 from marl_models.utils import get_model
 from marl_models.base_model import MARLModel
 from environment.env import Env
-from train import train_on_policy, train_off_policy
+from train import train_on_policy, train_off_policy, train_random
 from test import test_model
 from utils.logger import Logger
 from utils.plot_logs import generate_plots
@@ -42,7 +42,7 @@ def start_training(args: argparse.Namespace):
     elif model_name == "mappo":
         train_on_policy(env, model, logger, args.num_episodes)
     else:  # "random"
-        test_model(env, model, logger, args.num_episodes)  # Training = Testing for random model
+        train_random(env, model, logger, args.num_episodes)  # Training = Testing for random model
 
     print("✅ Training Completed!\n")
     print("📊 Generating plots...\n")

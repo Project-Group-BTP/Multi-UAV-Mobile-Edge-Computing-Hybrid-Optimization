@@ -1,6 +1,6 @@
 from marl_models.base_model import MARLModel, ExperienceBatch
-from marl_models.utils import soft_update, GaussianNoise
 from marl_models.maddpg.agents import ActorNetwork, CriticNetwork
+from marl_models.buffer_and_helpers import soft_update, GaussianNoise
 import config
 import torch
 import torch.nn.functional as F

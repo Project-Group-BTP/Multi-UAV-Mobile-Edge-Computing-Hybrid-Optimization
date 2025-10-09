@@ -112,3 +112,26 @@ class RolloutBuffer:
 
     def clear(self) -> None:
         self.step = 0
+
+
+def soft_update(target_net: torch.nn.Module, source_net: torch.nn.Module, tau: float):
+    """Performs a soft update of the target network's parameters."""
+    with torch.no_grad():
+        for target_param, param in zip(target_net.parameters(), source_net.parameters()):
+            target_param.copy_(tau * param + (1.0 - tau) * target_param)
+
+
+class GaussianNoise:
+    """Gaussian noise with decay for exploration."""
+
+    def __init__(self) -> None:
+        self.scale: float = config.INITIAL_NOISE_SCALE
+
+    def sample(self) -> np.ndarray:
+        return np.random.normal(0, self.scale, config.ACTION_DIM)
+
+    def decay(self) -> None:
+        self.scale = max(config.MIN_NOISE_SCALE, self.scale * config.NOISE_DECAY_RATE)
+
+    def reset(self) -> None:
+        self.scale = config.INITIAL_NOISE_SCALE

@@ -8,13 +8,13 @@ import numpy as np
 import os
 
 
-def plot_snapshot(env: Env, time_step: int, save_path: str | None = None) -> None:
+def plot_snapshot(env: Env, progress_step: int, save_dir: str) -> None:
     """Generates and saves a plot of the current environment state."""
     fig, ax = plt.subplots(figsize=(12, 12))
     ax.set_xlim(0, config.AREA_WIDTH)
     ax.set_ylim(0, config.AREA_HEIGHT)
     ax.set_aspect("equal")
-    ax.set_title(f"Simulation Snapshot at Time Step: {time_step}")
+    ax.set_title(f"Simulation Snapshot at Step: {progress_step}")
     ax.set_xlabel("X coordinate (m)")
     ax.set_ylabel("Y coordinate (m)")
 
@@ -41,23 +41,20 @@ def plot_snapshot(env: Env, time_step: int, save_path: str | None = None) -> Non
 
     # Create a clean legend
     handles, labels = ax.get_legend_handles_labels()
-    by_label = dict(zip(labels, handles))
+    by_label: dict = dict(zip(labels, handles))
     ax.legend(by_label.values(), by_label.keys(), loc="upper right")
 
-    # Save the figure
-    if save_path:
-        plt.savefig(f"{save_path}/step_{time_step:04d}.png")
-
-    plt.close(fig)  # Close the figure to free up memory
+    plt.savefig(f"{save_dir}/step_{progress_step:04d}.png")
+    plt.close(fig)
 
 
-def generate_random_actions(env: Env, max_retries: int = 20) -> list[np.ndarray]:
+def generate_random_actions(env: Env, max_retries: int = 20) -> np.ndarray:
     """
     Generates a valid random action for each UAV, now with collision avoidance.
     It sequentially generates an action for each UAV, ensuring the new position
     respects the minimum separation distance from other UAVs' new positions.
     """
-    actions: list[np.ndarray] = []
+    actions_raw: list[np.ndarray] = []
     new_positions: list[np.ndarray] = []  # Store the intended new (x, y) positions of UAVs
     max_dist: float = config.UAV_SPEED * config.TIME_SLOT_DURATION
 
@@ -87,42 +84,30 @@ def generate_random_actions(env: Env, max_retries: int = 20) -> list[np.ndarray]
             if is_valid:
                 # Step 3: If the move is valid, accept it and break the retry loop
                 new_positions.append(candidate_pos)
-                actions.append(candidate_pos)
+                actions_raw.append(candidate_pos)
                 break
 
         else:  # This 'else' triggers if the 'for' loop completes without a 'break'
             # Step 4: If no valid move was found, the UAV stays in its current position
             new_positions.append(current_pos)
-            actions.append(current_pos)
-
+            actions_raw.append(current_pos)
+    actions: np.ndarray = np.array(actions_raw)
     return actions
 
 
 def main() -> None:
-    # Initialize the environment
     env: Env = Env()
-
-    # Create a directory to save visualization frames
     vis_dir: str = "simulation_frames"
     if not os.path.exists(vis_dir):
         os.makedirs(vis_dir)
         print(f"Created directory: {vis_dir}")
-
     print("Starting simulation with random actions (with collision avoidance)...")
-
-    # Run the simulation for a set number of time slots
     for t in range(config.STEPS_PER_EPISODE):
-        # 1. Generate random actions for each UAV
-        actions_raw: list[np.ndarray] = generate_random_actions(env)
-        actions: np.ndarray = np.array(actions_raw)
-        # 2. Step the environment forward
-        env.step(actions)
-
-        # 3. Visualize and save the current state periodically
-        if t % 5 == 0:
-            plot_snapshot(env, t, save_path=vis_dir)
+        actions: np.ndarray = generate_random_actions(env)
+        env.step(actions, visualize=True)
+        if t % 50 == 0:
+            plot_snapshot(env, t, vis_dir)
             print(f"Saved frame for time step {t}")
-
     print(f"\nSimulation finished. Visualization frames are saved in the '{vis_dir}' directory.")
 
 

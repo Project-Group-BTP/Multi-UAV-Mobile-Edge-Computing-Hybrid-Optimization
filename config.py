@@ -1,13 +1,13 @@
 import numpy as np
 
 # Training Parameters
-MODEL: str = "mappo"  # options: 'maddpg', 'matd3', 'mappo', 'masac', 'random'
+MODEL: str = "maddpg"  # options: 'maddpg', 'matd3', 'mappo', 'masac', 'random'
 SEED: int = 1234  # random seed for reproducibility
 STEPS_PER_EPISODE: int = 1000  # total T
 LOG_FREQ: int = 10  # episodes
-IMG_FREQ: int = 100  # episodes
+IMG_FREQ: int = 100  # steps
 TEST_LOG_FREQ: int = 1  # episodes (for testing)
-TEST_IMG_FREQ: int = 1  # episodes (for testing)
+TEST_IMG_FREQ: int = 1  # steps (for testing)
 LEARN_FREQ: int = 5  # steps
 
 RESUME_DIRECTORY: str = ""  # path to saved model directory to resume training from
@@ -30,6 +30,16 @@ UAV_COMPUTING_CAPACITY: np.ndarray = np.random.choice(np.arange(1e9, 10.1e9, 1e8
 UAV_SENSING_RANGE: float = 300.0  # R^sense in meters
 UAV_COVERAGE_RADIUS: float = 100.0  # R in meters
 
+# Collision Avoidance and Penalties
+COLLISION_AVOIDANCE_ITERATIONS: int = 10  # number of iterations to resolve collisions
+COLLISION_PENALTY: float = 10.0  # penalty per collision
+BOUNDARY_PENALTY: float = 5.0  # penalty for going out of bounds
+# IMPORTANT : Reconfigurable, should try for various values including : NUM_UAVS - 1 and NUM_UES
+MAX_UAV_NEIGHBORS: int = NUM_UAVS // 2
+MAX_ASSOCIATED_UES: int = NUM_UES // NUM_UAVS
+assert MAX_UAV_NEIGHBORS >= 1 and MAX_UAV_NEIGHBORS <= NUM_UAVS - 1
+assert MAX_ASSOCIATED_UES >= 1 and MAX_ASSOCIATED_UES <= NUM_UES
+
 MIN_UAV_SEPARATION: float = 200.0  # d_min in meters
 assert UAV_COVERAGE_RADIUS * 2 <= MIN_UAV_SEPARATION
 
@@ -44,8 +54,10 @@ CPU_CYCLES_PER_BYTE: np.ndarray = np.random.randint(500, 1500, size=NUM_SERVICES
 FILE_SIZES: np.ndarray = np.random.randint(1_000, 1_000_000, size=NUM_FILES)  # 1KB to 1MB
 MIN_INPUT_SIZE: int = 1_000  # 1KB
 MAX_INPUT_SIZE: int = 1_000_000  # 1MB
-ZIPF_BETA: float = 0.8
+ZIPF_BETA: float = 0.8  # beta^Zipf
 K_CPU: float = 1e-9  # CPU capacitance coefficient
+
+# Caching Parameters
 T_CACHE_UPDATE_INTERVAL: int = 10  # T_cache
 GDSF_SMOOTHING_FACTOR: float = 0.5  # beta^gdsf
 
@@ -64,8 +76,10 @@ ALPHA_2 = 0.4  # for energy
 ALPHA_3 = 0.2  # for fairness
 assert round(ALPHA_1 + ALPHA_2 + ALPHA_3, 3) == 1.0
 
-OBS_DIM_SINGLE: int = 5
-ACTION_DIM: int = 2
+OBS_DIM_SINGLE: int = 2 + NUM_FILES + (MAX_UAV_NEIGHBORS * (2 + NUM_FILES)) + (MAX_ASSOCIATED_UES * (2 + 3))
+# own state: pos (2) + cache (NUM_FILES) + Neighbors: pos (2) + cache (NUM_FILES) + UEs: pos (2) + request_tuple (3)
+
+ACTION_DIM: int = 2  # angle, distance from [-1, 1]
 STATE_DIM: int = NUM_UAVS * OBS_DIM_SINGLE
 MLP_HIDDEN_DIM: int = 160
 

@@ -7,3 +7,7 @@ __pycache__/
 rough*
 idea*
 simulation_frames/
+train_logs/
+test_logs/
+saved_models/
+*.tex

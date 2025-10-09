@@ -2,7 +2,7 @@
 
 The primary objective of this research is to develop a framework for a multi-UAV-assisted Mobile Edge Computing (MEC) network. We aim to jointly optimize four interdependent components: task offloading decisions, service caching placement, content caching strategies, and UAV trajectories. The goal is to minimize a weighted sum of service latency and system-wide energy consumption while simultaneously maximizing user fairness.
 
-We are aiming to implement a hybrid optimization approach that combines multi-agent deep reinforcement learning with deterministic but adaptive caching policies. We are trying to create a generic framework that can be used with different models for finding the best-suited one for our purpose. Trying to incorporate modern Python practices and type annotations. Developed using Python 3.12.0 and PyTorch 2.2.2.
+We are aiming to implement a hybrid optimization approach that combines multi-agent deep reinforcement learning with deterministic but adaptive caching policies. We are trying to create a generic framework that can be used with different models for finding the best-suited one for our purpose. Trying to incorporate modern Python practices and type annotations. Developed using Python 3.12.0 and PyTorch 2.8.0.
 
 Currently included MARL models:
 - MADDPG (Multi-Agent Deep Deterministic Policy Gradient)
@@ -22,7 +22,7 @@ Directory Structure:
 │   └── user_equipments.py
 ├── marl_models
 │   ├── base_model.py
-│   ├── buffer.py
+│   ├── buffer_and_helpers.py
 │   ├── utils.py
 │   ├── maddpg
 │   │   ├── agents.py
@@ -45,7 +45,7 @@ Directory Structure:
 ├── config.py
 ├── train.py
 ├── test.py
-├── final_main.py
+├── main.py
 ├── visualize.py
 ├── requirements.txt
 ├── README.md
@@ -60,5 +60,10 @@ Run using:
 ```bash
 python visualize.py
 ```
+
+Packages currently needed to be installed (can be found in requirements.txt):
+- torch
+- numpy
+- matplotlib
 
 **Still under rapid development and may be subject to significant changes.**
