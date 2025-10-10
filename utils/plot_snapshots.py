@@ -6,10 +6,9 @@ import os
 import numpy as np
 
 
-def plot_snapshot(env: Env, progress_step: int, step: int, save_dir: str, name: str, initial: bool = False) -> None:
+def plot_snapshot(env: Env, progress_step: int, step: int, save_dir: str, name: str, timestamp: str, initial: bool = False) -> None:
     """Generates and saves a plot of the current environment state."""
-
-    save_path: str = f"{save_dir}/state_images/{name}_{progress_step:04d}"
+    save_path = f"{save_dir}/state_images_{timestamp}/{name}_{progress_step:04d}"
     if not os.path.exists(save_path):
         os.makedirs(save_path)
     fig, ax = plt.subplots(figsize=(12, 12))

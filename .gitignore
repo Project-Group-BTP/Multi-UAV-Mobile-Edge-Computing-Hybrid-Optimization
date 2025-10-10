@@ -4,10 +4,12 @@ __pycache__/
 .venv/
 *.pth
 *.png
+*.txt
+*.json
 rough*
-idea*
 simulation_frames/
 train_logs/
 test_logs/
+train_plots/
+test_plots/
 saved_models/
-*.tex

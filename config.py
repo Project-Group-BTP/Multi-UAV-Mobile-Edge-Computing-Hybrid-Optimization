@@ -10,8 +10,6 @@ TEST_LOG_FREQ: int = 1  # episodes (for testing)
 TEST_IMG_FREQ: int = 1  # steps (for testing)
 LEARN_FREQ: int = 5  # steps
 
-RESUME_DIRECTORY: str = ""  # path to saved model directory to resume training from
-
 # Simulation Parameters
 MBS_POS: np.ndarray = np.array([0.0, 0.0, 0.0])  # (X_mbs, Y_mbs, Z_mbs) in meters
 NUM_UAVS: int = 10  # U

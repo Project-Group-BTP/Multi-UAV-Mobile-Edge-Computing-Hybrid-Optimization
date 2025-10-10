@@ -9,22 +9,24 @@ import config
 import torch
 import numpy as np
 import argparse
+import warnings
 from datetime import datetime
 
 
 def start_training(args: argparse.Namespace):
     timestamp: str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     print(f"\n🚀 Training started at {timestamp} for {args.num_episodes} episodes\n")
-    logger: Logger = Logger(
-        log_dir="./train_logs",
-        log_file_name=f"logs_{timestamp}.txt",
-        log_data_file_name=f"log_data_{timestamp}.json",
-        config_file_name=f"config_{timestamp}.json",
-    )
-    logger.log_configs()
-
-    if args.resume:
-        logger.load_configs(f"{config.RESUME_DIRECTORY}/config.json")
+    logger: Logger = Logger(timestamp, "./train_logs", f"logs_{timestamp}.txt", f"log_data_{timestamp}.json", f"config_{timestamp}.json")
+    resume_training: bool = args.resume_path is not None
+    if resume_training:
+        if args.config_path is None:
+            raise ValueError("If --resume_path is provided, --config_path must also be provided.")
+        else:
+            logger.load_configs(args.config_path)  # Resume training with old config
+    else:  # Fresh training
+        if args.config_path is not None:
+            warnings.warn("--config_path is ignored during training unless --resume_path is also provided.")
+        logger.log_configs()
 
     np.random.seed(config.SEED)
     torch.manual_seed(config.SEED)
@@ -32,10 +34,10 @@ def start_training(args: argparse.Namespace):
     model_name: str = config.MODEL.lower()
     model: MARLModel = get_model(model_name)
 
-    if args.resume:
-        model.load(config.RESUME_DIRECTORY)
-        print(f"📥 Models loaded successfully from {config.RESUME_DIRECTORY}")
-        print(f"📂 Resumed training from: {config.RESUME_DIRECTORY}\n")
+    if resume_training:
+        model.load(args.resume_path)
+        print(f"📥 Models loaded successfully from {args.resume_path}")
+        print(f"📂 Resumed training from: {args.resume_path}\n")
 
     if model_name in ["maddpg", "matd3", "masac"]:
         train_off_policy(env, model, logger, args.num_episodes)
@@ -45,26 +47,20 @@ def start_training(args: argparse.Namespace):
         train_random(env, model, logger, args.num_episodes)  # Training = Testing for random model
 
     print("✅ Training Completed!\n")
-    print("📊 Generating plots...\n")
-    generate_plots(log_file=f"./train_logs/log_data_{timestamp}.json", output_dir="./train_plots/", output_file_prefix="train")
+    print("📊 Generating plots...")
+    generate_plots(f"./train_logs/log_data_{timestamp}.json", "./train_plots/", "train", timestamp)
 
 
 def start_testing(args: argparse.Namespace):
     timestamp: str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     print(f"\n🚀 Testing started at {timestamp} for {args.num_episodes} episodes\n")
-    logger: Logger = Logger(
-        log_dir="./test_logs",
-        log_file_name=f"logs_{timestamp}.txt",
-        log_data_file_name=f"log_data_{timestamp}.json",
-        config_file_name=f"config_{timestamp}.json",
-    )
+    logger: Logger = Logger(timestamp, "./test_logs", f"logs_{timestamp}.txt", f"log_data_{timestamp}.json", f"config_{timestamp}.json")
     logger.load_configs(args.config_path)
 
     np.random.seed(config.SEED)
     torch.manual_seed(config.SEED)
     env: Env = Env()
-    model_name: str = config.MODEL.lower()
-    model: MARLModel = get_model(model_name)
+    model: MARLModel = get_model(config.MODEL.lower())
 
     model.load(args.model_path)
     print(f"📥 Models loaded successfully from {args.model_path}")
@@ -72,8 +68,8 @@ def start_testing(args: argparse.Namespace):
     test_model(env, model, logger, args.num_episodes)
 
     print("✅ Testing Completed!\n")
-    print("📊 Generating plots...\n")
-    generate_plots(log_file=f"./test_logs/log_data_{timestamp}.json", output_dir="./test_plots/", output_file_prefix="test")
+    print("📊 Generating plots...")
+    generate_plots(f"./test_logs/log_data_{timestamp}.json", "./test_plots/", "test", timestamp)
 
 
 if __name__ == "__main__":
@@ -82,7 +78,8 @@ if __name__ == "__main__":
     parent_parser = argparse.ArgumentParser(add_help=False)
     parent_parser.add_argument("--num_episodes", type=int, required=True)
     train_parser = subparsers.add_parser("train", parents=[parent_parser])
-    train_parser.add_argument("--resume", action="store_true", default=False)
+    train_parser.add_argument("--resume_path", type=str, default=None)
+    train_parser.add_argument("--config_path", type=str, default=None)
 
     test_parser = subparsers.add_parser("test", parents=[parent_parser])
     test_parser.add_argument("--model_path", type=str, required=True)

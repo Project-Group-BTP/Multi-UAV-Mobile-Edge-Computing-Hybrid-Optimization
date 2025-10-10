@@ -12,13 +12,13 @@ import os
 def get_device() -> str:
     """Check if GPU is available and set device accordingly."""
     if torch.cuda.is_available():
-        print("\n🤖 Found GPU, using CUDA.")
+        print("\nFound GPU, using CUDA.\n")
         return "cuda"
     elif torch.backends.mps.is_available():
-        print("\n🤖 Using MPS (Apple Silicon GPU).")
+        print("\nUsing MPS (Apple Silicon GPU).\n")
         return "mps"
     else:
-        print("\n⚙️ No GPU available, using CPU.")
+        print("\nNo GPU available, using CPU.\n")
         return "cpu"
 
 
@@ -38,8 +38,8 @@ def get_model(model_name: str) -> MARLModel:
         raise ValueError(f"Unknown model type: {model_name}. Supported types: maddpg, matd3, mappo, masac, random")
 
 
-def save_models(model: MARLModel, progress_step: int, name: str, final: bool = False):
-    save_dir: str = f"saved_models/{model.model_name}"
+def save_models(model: MARLModel, progress_step: int, name: str, timestamp: str, final: bool = False):
+    save_dir: str = f"saved_models/{model.model_name}_{timestamp}"
     if final:
         save_dir = f"{save_dir}/final"
     else:

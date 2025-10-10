@@ -19,9 +19,10 @@ class Log:
 
 
 class Logger:
-    def __init__(self, log_dir: str = ".", log_file_name: str = "logs.txt", log_data_file_name: str = "log_data.json", config_file_name: str = "config.json") -> None:
+    def __init__(self, timestamp: str, log_dir: str = ".", log_file_name: str = "logs.txt", log_data_file_name: str = "log_data.json", config_file_name: str = "config.json") -> None:
         if not os.path.exists(log_dir):
             os.makedirs(log_dir)
+        self.timestamp: str = timestamp
         self.log_dir: str = log_dir
         self.log_file_path: str = os.path.join(self.log_dir, log_file_name)
         self.json_file_path: str = os.path.join(self.log_dir, log_data_file_name)

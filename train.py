@@ -28,11 +28,11 @@ def train_on_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: in
         rollout_latency: float = 0.0
         rollout_energy: float = 0.0
         rollout_fairness: float = 0.0
-        plot_snapshot(env, update, 0, logger.log_dir, "update", True)
+        plot_snapshot(env, update, 0, logger.log_dir, "update", logger.timestamp, True)
 
         for step in range(1, config.PPO_ROLLOUT_LENGTH + 1):
             if step % config.IMG_FREQ == 0:
-                plot_snapshot(env, update, step, logger.log_dir, "update")
+                plot_snapshot(env, update, step, logger.log_dir, "update", logger.timestamp)
 
             total_step_count += 1
             obs_arr: np.ndarray = np.array(obs)
@@ -68,9 +68,9 @@ def train_on_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: in
             elapsed_time: float = time.time() - start_time
             logger.log_metrics(update, rollout_log, config.LOG_FREQ, elapsed_time, "update")
         if update % save_freq == 0 and update < num_episodes:
-            save_models(model, update, "update")
+            save_models(model, update, "update", logger.timestamp)
 
-    save_models(model, update, "update", final=True)
+    save_models(model, update, "update", logger.timestamp, final=True)
 
 
 def train_off_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: int) -> None:
@@ -89,11 +89,11 @@ def train_off_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: i
         episode_latency: float = 0.0
         episode_energy: float = 0.0
         episode_fairness: float = 0.0
-        plot_snapshot(env, episode, 0, logger.log_dir, "episode", True)
+        plot_snapshot(env, episode, 0, logger.log_dir, "episode", logger.timestamp, True)
 
         for step in range(1, config.STEPS_PER_EPISODE + 1):
             if step % config.IMG_FREQ == 0:
-                plot_snapshot(env, episode, step, logger.log_dir, "episode")
+                plot_snapshot(env, episode, step, logger.log_dir, "episode", logger.timestamp)
 
             total_step_count += 1
             if total_step_count <= config.INITIAL_RANDOM_STEPS:
@@ -123,9 +123,9 @@ def train_off_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: i
             elapsed_time: float = time.time() - start_time
             logger.log_metrics(episode, episode_log, config.LOG_FREQ, elapsed_time, "episode")
         if episode % save_freq == 0 and episode < num_episodes:
-            save_models(model, episode, "episode")
+            save_models(model, episode, "episode", logger.timestamp)
 
-    save_models(model, episode, "episode", final=True)
+    save_models(model, episode, "episode", logger.timestamp, final=True)
 
 
 def train_random(env: Env, model: MARLModel, logger: Logger, num_episodes: int) -> None:
@@ -138,11 +138,11 @@ def train_random(env: Env, model: MARLModel, logger: Logger, num_episodes: int) 
         episode_latency: float = 0.0
         episode_energy: float = 0.0
         episode_fairness: float = 0.0
-        plot_snapshot(env, episode, 0, logger.log_dir, "episode", True)
+        plot_snapshot(env, episode, 0, logger.log_dir, "episode", logger.timestamp, True)
 
         for step in range(1, config.STEPS_PER_EPISODE + 1):
             if step % config.IMG_FREQ == 0:
-                plot_snapshot(env, episode, step, logger.log_dir, "episode")
+                plot_snapshot(env, episode, step, logger.log_dir, "episode", logger.timestamp)
 
             actions: np.ndarray = model.select_actions(obs, exploration=False)
             next_obs, rewards, (total_latency, total_energy, jfi) = env.step(actions)
@@ -156,7 +156,7 @@ def train_random(env: Env, model: MARLModel, logger: Logger, num_episodes: int) 
             if done:
                 break
 
-        episode_log.append(episode_reward, episode_latency, episode_energy, episode_fairness / step)
+        episode_log.append(episode_reward, episode_latency, episode_energy, episode_fairness)
         if episode % config.LOG_FREQ == 0:
             elapsed_time: float = time.time() - start_time
             logger.log_metrics(episode, episode_log, config.LOG_FREQ, elapsed_time, "episode")

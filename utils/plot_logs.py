@@ -14,10 +14,9 @@ def plot_metric(x: list, y: list, xlabel: str, ylabel: str, title: str, output_p
     plt.tight_layout()
     plt.savefig(output_path)
     plt.close()
-    print(f"📊 {title} plot saved to {output_path}")
 
 
-def generate_plots(log_file: str, output_dir: str, output_file_prefix: str) -> None:
+def generate_plots(log_file: str, output_dir: str, output_file_prefix: str, timestamp: str) -> None:
     """Generate plots from the logs stored in 'log_file'"""
 
     with open(log_file, "r") as file:
@@ -37,9 +36,9 @@ def generate_plots(log_file: str, output_dir: str, output_file_prefix: str) -> N
     metrics: list[str] = ["reward", "latency", "energy", "fairness"]
     for metric in metrics:
         title: str = f"{metric.replace('_', ' ').title()} vs {x_label}"
-        output_path: str = os.path.join(output_dir, f"{output_file_prefix}_{metric}.png")
+        output_path: str = os.path.join(output_dir, f"{output_file_prefix}_{metric}_{timestamp}.png")
         plot_metric(parameters[x_axis_key], parameters[metric], x_label, metric.title(), title, output_path)
-    plot_metric(parameters["latency"], parameters["fairness"], "Latency", "Fairness", "Fairness vs Latency", os.path.join(output_dir, f"{output_file_prefix}_fairness_vs_latency.png"))
-    plot_metric(parameters["energy"], parameters["fairness"], "Energy", "Fairness", "Fairness vs Energy", os.path.join(output_dir, f"{output_file_prefix}_fairness_vs_energy.png"))
-    plot_metric(parameters["latency"], parameters["energy"], "Latency", "Energy", "Energy vs Latency", os.path.join(output_dir, f"{output_file_prefix}_energy_vs_latency.png"))
-    print(f"\n✅ All scatter plots saved to {output_dir}\n")
+    plot_metric(parameters["latency"], parameters["fairness"], "Latency", "Fairness", "Fairness vs Latency", os.path.join(output_dir, f"{output_file_prefix}_fairness_vs_latency_{timestamp}.png"))
+    plot_metric(parameters["energy"], parameters["fairness"], "Energy", "Fairness", "Fairness vs Energy", os.path.join(output_dir, f"{output_file_prefix}_fairness_vs_energy_{timestamp}.png"))
+    plot_metric(parameters["latency"], parameters["energy"], "Latency", "Energy", "Energy vs Latency", os.path.join(output_dir, f"{output_file_prefix}_energy_vs_latency_{timestamp}.png"))
+    print(f"✅ All scatter plots saved to {output_dir}\n")
