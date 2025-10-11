@@ -38,7 +38,7 @@ def get_model(model_name: str) -> MARLModel:
         raise ValueError(f"Unknown model type: {model_name}. Supported types: maddpg, matd3, mappo, masac, random")
 
 
-def save_models(model: MARLModel, progress_step: int, name: str, timestamp: str, final: bool = False):
+def save_models(model: MARLModel, progress_step: int, name: str, timestamp: str, final: bool = False, total_steps: int = 0):
     save_dir: str = f"saved_models/{model.model_name}_{timestamp}"
     if final:
         save_dir = f"{save_dir}/final"
@@ -48,7 +48,21 @@ def save_models(model: MARLModel, progress_step: int, name: str, timestamp: str,
         os.makedirs(save_dir)
 
     model.save(save_dir)
+
+    if total_steps > 0:
+        step_count_path: str = os.path.join(save_dir, "total_steps.txt")
+        with open(step_count_path, "w") as f:
+            f.write(str(total_steps))
+
     if final:
         print(f"📁 Final models saved in: {save_dir}\n")
     else:
         print(f"📁 Models saved for {name.lower()} {progress_step} in: {save_dir}\n")
+
+
+def load_step_count(directory: str) -> int:
+    step_count_path: str = os.path.join(directory, "total_steps.txt")
+    if os.path.exists(step_count_path):
+        with open(step_count_path, "r") as f:
+            return int(f.read().strip())
+    return 0

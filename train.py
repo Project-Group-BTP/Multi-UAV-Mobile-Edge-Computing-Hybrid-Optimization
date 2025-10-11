@@ -15,10 +15,13 @@ def train_on_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: in
     buffer: RolloutBuffer = RolloutBuffer(num_agents=config.NUM_UAVS, obs_dim=config.OBS_DIM_SINGLE, action_dim=config.ACTION_DIM, state_dim=config.STATE_DIM, buffer_size=config.PPO_ROLLOUT_LENGTH, device=model.device)
     max_time_steps: int = num_episodes * config.STEPS_PER_EPISODE
     num_updates: int = max_time_steps // config.PPO_ROLLOUT_LENGTH
-    total_step_count: int = 0
+    assert num_updates > 0, "num_updates is 0, please modify settings."
     save_freq: int = num_episodes // 10
     if num_episodes < 1000:
         save_freq = 100
+    print(f"Total updates to be performed: {num_updates}")
+    print(f"Each update has {config.PPO_ROLLOUT_LENGTH} steps.")
+    print(f"Updates for {config.PPO_EPOCHS} epochs with batch size {config.PPO_BATCH_SIZE}.")
     rollout_log: Log = Log()
 
     for update in range(1, num_updates + 1):
@@ -34,7 +37,6 @@ def train_on_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: in
             if step % config.IMG_FREQ == 0:
                 plot_snapshot(env, update, step, logger.log_dir, "update", logger.timestamp)
 
-            total_step_count += 1
             obs_arr: np.ndarray = np.array(obs)
             actions, log_probs, value = model.get_action_and_value(obs_arr, state)
 
@@ -70,13 +72,12 @@ def train_on_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: in
         if update % save_freq == 0 and update < num_episodes:
             save_models(model, update, "update", logger.timestamp)
 
-    save_models(model, update, "update", logger.timestamp, final=True)
+    save_models(model, -1, "update", logger.timestamp, final=True)
 
 
-def train_off_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: int) -> None:
+def train_off_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: int, total_step_count: int) -> None:
     start_time: float = time.time()
     buffer: ReplayBuffer = ReplayBuffer(config.REPLAY_BUFFER_SIZE)
-    total_step_count: int = 0
     save_freq: int = num_episodes // 10
     if num_episodes < 1000:
         save_freq = 100
@@ -123,9 +124,9 @@ def train_off_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: i
             elapsed_time: float = time.time() - start_time
             logger.log_metrics(episode, episode_log, config.LOG_FREQ, elapsed_time, "episode")
         if episode % save_freq == 0 and episode < num_episodes:
-            save_models(model, episode, "episode", logger.timestamp)
+            save_models(model, episode, "episode", logger.timestamp, total_steps=total_step_count)
 
-    save_models(model, episode, "episode", logger.timestamp, final=True)
+    save_models(model, -1, "episode", logger.timestamp, final=True, total_steps=total_step_count)
 
 
 def train_random(env: Env, model: MARLModel, logger: Logger, num_episodes: int) -> None:

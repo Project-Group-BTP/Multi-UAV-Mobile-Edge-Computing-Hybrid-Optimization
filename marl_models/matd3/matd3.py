@@ -153,6 +153,9 @@ class MATD3(MARLModel):
                 },
                 os.path.join(directory, f"agent_{i}.pth"),
             )
+        update_counter_path: str = os.path.join(directory, "update_counter.txt")
+        with open(update_counter_path, "w") as f:
+            f.write(str(self.update_counter))
 
     def load(self, directory: str) -> None:
         if not os.path.exists(directory):
@@ -172,3 +175,10 @@ class MATD3(MARLModel):
             self.actor_optimizers[i].load_state_dict(checkpoint["actor_optimizer"])
             self.critic_1_optimizers[i].load_state_dict(checkpoint["critic_1_optimizer"])
             self.critic_2_optimizers[i].load_state_dict(checkpoint["critic_2_optimizer"])
+        update_counter_path: str = os.path.join(directory, "update_counter.txt")
+        if os.path.exists(update_counter_path):
+            with open(update_counter_path, "r") as f:
+                self.update_counter = int(f.read())
+        else:
+            self.update_counter = 0
+            print(f"⚠️ Update counter file not found: {update_counter_path}. Setting update_counter to 0.")

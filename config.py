@@ -7,7 +7,7 @@ STEPS_PER_EPISODE: int = 1000  # total T
 LOG_FREQ: int = 10  # episodes
 IMG_FREQ: int = 100  # steps
 TEST_LOG_FREQ: int = 1  # episodes (for testing)
-TEST_IMG_FREQ: int = 1  # steps (for testing)
+TEST_IMG_FREQ: int = 100  # steps (for testing)
 LEARN_FREQ: int = 5  # steps
 
 # Simulation Parameters
