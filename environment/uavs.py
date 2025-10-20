@@ -177,7 +177,7 @@ class UAV:
         assert req_id < config.NUM_SERVICES
 
         ue_assoc_uav_latency = req_size / ue_uav_rate
-        cpu_cycles = config.CPU_CYCLES_PER_BYTE[req_id] * req_size
+        cpu_cycles: int = config.CPU_CYCLES_PER_BYTE[req_id] * req_size
 
         if self.cache[req_id]:
             # Serve locally

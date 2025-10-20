@@ -28,6 +28,7 @@ class UE:
 
         self.current_request: tuple[int, int, int] = (0, 0, 0)  # Request : (req_type, req_size, req_id)
         self.latency_current_request: float = 0.0  # Latency for the current request
+        self.assigned: bool = False
 
         # Random Waypoint Model
         self._waypoint: np.ndarray
@@ -37,10 +38,6 @@ class UE:
         # Fairness Tracking
         self._successful_requests: int = 0
         self.service_coverage: float = 0.0
-
-    @property
-    def latency(self) -> float:
-        return self.latency_current_request
 
     def update_position(self) -> None:
         """Updates the UE's position for one time slot as per the Random Waypoint model."""
@@ -77,14 +74,15 @@ class UE:
 
         self.current_request = (req_type, req_size, req_id)
         self.latency_current_request = 0.0
+        self.assigned = False
 
-    def update_service_coverage(self, current_time_t: int) -> None:
+    def update_service_coverage(self, current_time_step_t: int) -> None:
         """Updates the fairness metric based on service outcome in the current slot."""
-        if self.latency_current_request <= config.TIME_SLOT_DURATION:
+        if self.assigned and self.latency_current_request <= config.TIME_SLOT_DURATION:
             self._successful_requests += 1
 
-        assert current_time_t > 0
-        self.service_coverage = self._successful_requests / current_time_t
+        assert current_time_step_t > 0
+        self.service_coverage = self._successful_requests / current_time_step_t
 
     def _set_new_waypoint(self):
         """Set a new destination, speed, and wait time as per the Random Waypoint model."""

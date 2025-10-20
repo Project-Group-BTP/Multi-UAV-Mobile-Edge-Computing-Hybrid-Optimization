@@ -1,0 +1,5 @@
+🔄 Episode 1 | Total Reward: -6968286.737 | Total Latency: 5784.704 | Total Energy: 1623431.419 | Final Fairness: 0.965 | Elapsed Time: 155.20s
+🔄 Episode 2 | Total Reward: -6883852.042 | Total Latency: 4482.068 | Total Energy: 1550650.884 | Final Fairness: 0.971 | Elapsed Time: 479.25s
+🔄 Episode 3 | Total Reward: -7365590.275 | Total Latency: 2549.646 | Total Energy: 1695426.073 | Final Fairness: 0.958 | Elapsed Time: 867.83s
+🔄 Episode 4 | Total Reward: -7071379.008 | Total Latency: 1584.986 | Total Energy: 1599805.798 | Final Fairness: 0.903 | Elapsed Time: 2479.10s
+🔄 Episode 5 | Total Reward: -7022082.847 | Total Latency: 2697.567 | Total Energy: 1543585.016 | Final Fairness: 0.901 | Elapsed Time: 2911.12s

@@ -19,14 +19,14 @@ class Log:
 
 
 class Logger:
-    def __init__(self, timestamp: str, log_dir: str = ".", log_file_name: str = "logs.txt", log_data_file_name: str = "log_data.json", config_file_name: str = "config.json") -> None:
+    def __init__(self, log_dir: str, timestamp: str) -> None:
         if not os.path.exists(log_dir):
             os.makedirs(log_dir)
         self.timestamp: str = timestamp
         self.log_dir: str = log_dir
-        self.log_file_path: str = os.path.join(self.log_dir, log_file_name)
-        self.json_file_path: str = os.path.join(self.log_dir, log_data_file_name)
-        self.config_file_path: str = os.path.join(self.log_dir, config_file_name)
+        self.log_file_path: str = os.path.join(self.log_dir, f"logs_{timestamp}.txt")
+        self.json_file_path: str = os.path.join(self.log_dir, f"log_data_{timestamp}.json")
+        self.config_file_path: str = os.path.join(self.log_dir, f"config_{timestamp}.json")
 
     def log_configs(self) -> None:
         config_dict: dict = {key: getattr(default_config, key) for key in dir(default_config) if key.isupper() and not key.startswith("__") and not callable(getattr(default_config, key))}

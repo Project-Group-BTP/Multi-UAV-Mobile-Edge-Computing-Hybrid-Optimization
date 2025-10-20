@@ -7,10 +7,10 @@ import numpy as np
 class Env:
     def __init__(self) -> None:
         self._mbs_pos: np.ndarray = config.MBS_POS
+        UE.initialize_ue_class()
         self._ues: list[UE] = [UE(i) for i in range(config.NUM_UES)]
         self._uavs: list[UAV] = [UAV(i) for i in range(config.NUM_UAVS)]
         self._time_step: int = 0
-        UE.initialize_ue_class()
 
     @property
     def uavs(self) -> list[UAV]:
@@ -150,13 +150,13 @@ class Env:
 
             if not covering_uavs:
                 continue
-
             best_uav, _ = min(covering_uavs, key=lambda x: x[1])
             best_uav.current_covered_ues.append(ue)
+            ue.assigned = True
 
     def _get_rewards_and_metrics(self) -> tuple[list[float], tuple[float, float, float]]:
         """Returns the reward and other metrics."""
-        total_latency: float = sum(ue.latency for ue in self._ues)
+        total_latency: float = sum(ue.latency_current_request for ue in self._ues)
         total_energy: float = sum(uav.energy for uav in self._uavs)
         sc_metrics: np.ndarray = np.array([ue.service_coverage for ue in self._ues if ue.service_coverage > 0])
         jfi: float = 0.0

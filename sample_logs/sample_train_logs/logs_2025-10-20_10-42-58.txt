@@ -1,0 +1,2 @@
+🔄 Update 1 | Total Reward: -13484692.648 | Total Latency: 6684.306 | Total Energy: 2974694.534 | Final Fairness: 0.957 | Elapsed Time: 178.40s
+🔄 Update 2 | Total Reward: -14878112.224 | Total Latency: 5615.904 | Total Energy: 3262930.448 | Final Fairness: 0.939 | Elapsed Time: 359.96s

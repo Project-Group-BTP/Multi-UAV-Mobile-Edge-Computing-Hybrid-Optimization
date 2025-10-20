@@ -3,9 +3,6 @@ __pycache__/
 .vscode/
 .venv/
 *.pth
-*.png
-*.txt
-*.json
 rough*
 simulation_frames/
 train_logs/
@@ -13,3 +10,6 @@ test_logs/
 train_plots/
 test_plots/
 saved_models/
+# *.png
+# *.txt
+# *.json

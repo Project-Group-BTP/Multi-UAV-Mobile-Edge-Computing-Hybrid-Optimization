@@ -8,64 +8,63 @@ LOG_FREQ: int = 10  # episodes
 IMG_FREQ: int = 100  # steps
 TEST_LOG_FREQ: int = 1  # episodes (for testing)
 TEST_IMG_FREQ: int = 100  # steps (for testing)
-LEARN_FREQ: int = 5  # steps
 
 # Simulation Parameters
-MBS_POS: np.ndarray = np.array([0.0, 0.0, 0.0])  # (X_mbs, Y_mbs, Z_mbs) in meters
+MBS_POS: np.ndarray = np.array([500.0, 500.0, 30.0])  # (X_mbs, Y_mbs, Z_mbs) in meters
 NUM_UAVS: int = 10  # U
 NUM_UES: int = 200  # M
 AREA_WIDTH: int = 1000  # X_max in meters
 AREA_HEIGHT: int = 1000  # Y_max in meters
-TIME_SLOT_DURATION: int = 1  # tau in seconds
-UE_MAX_DIST: int = 50  # d_max^UE in meters
-UE_MAX_WAIT_TIME: int = 5  # in time slots
+TIME_SLOT_DURATION: float = 1.0  # tau in seconds
+UE_MAX_DIST: int = 20  # d_max^UE in meters
+UE_MAX_WAIT_TIME: int = 10  # in time slots
 
 # UAV Parameters
 UAV_ALTITUDE: int = 100  # H in meters
-UAV_SPEED: int = 50  # v^UAV in m/s
-UAV_STORAGE_CAPACITY: np.ndarray = np.random.choice(np.arange(1e6, 10.1e6, 1e5), size=NUM_UAVS)  # S_u in bytes (1MB to 10MB in 100KB steps)
-UAV_COMPUTING_CAPACITY: np.ndarray = np.random.choice(np.arange(1e9, 10.1e9, 1e8), size=NUM_UAVS)  # F_u in cycles/sec (1GHz to 10GHz in 100M steps)
+UAV_SPEED: int = 30  # v^UAV in m/s
+UAV_STORAGE_CAPACITY: np.ndarray = np.random.choice(np.arange(5 * 10**6, 20 * 10**6, 10**6), size=NUM_UAVS)  # S_u in bytes
+UAV_COMPUTING_CAPACITY: np.ndarray = np.random.choice(np.arange(5 * 10**9, 20 * 10**9, 10**9), size=NUM_UAVS)  # F_u in cycles/sec
 UAV_SENSING_RANGE: float = 300.0  # R^sense in meters
 UAV_COVERAGE_RADIUS: float = 100.0  # R in meters
+MIN_UAV_SEPARATION: float = 200.0  # d_min in meters
+assert UAV_COVERAGE_RADIUS * 2 <= MIN_UAV_SEPARATION
+assert UAV_SENSING_RANGE >= MIN_UAV_SEPARATION
 
 # Collision Avoidance and Penalties
-COLLISION_AVOIDANCE_ITERATIONS: int = 10  # number of iterations to resolve collisions
-COLLISION_PENALTY: float = 10.0  # penalty per collision
-BOUNDARY_PENALTY: float = 5.0  # penalty for going out of bounds
+COLLISION_AVOIDANCE_ITERATIONS: int = 20  # number of iterations to resolve collisions
+COLLISION_PENALTY: float = 100.0  # penalty per collision
+BOUNDARY_PENALTY: float = 50.0  # penalty for going out of bounds
 # IMPORTANT : Reconfigurable, should try for various values including : NUM_UAVS - 1 and NUM_UES
-MAX_UAV_NEIGHBORS: int = NUM_UAVS // 2
-MAX_ASSOCIATED_UES: int = NUM_UES // NUM_UAVS
+MAX_UAV_NEIGHBORS: int = min(5, NUM_UAVS - 1)
+MAX_ASSOCIATED_UES: int = min(30, NUM_UES // NUM_UAVS + 10)
 assert MAX_UAV_NEIGHBORS >= 1 and MAX_UAV_NEIGHBORS <= NUM_UAVS - 1
 assert MAX_ASSOCIATED_UES >= 1 and MAX_ASSOCIATED_UES <= NUM_UES
 
-MIN_UAV_SEPARATION: float = 200.0  # d_min in meters
-assert UAV_COVERAGE_RADIUS * 2 <= MIN_UAV_SEPARATION
-
-POWER_MOVE: float = 150.0  # P_move in Watts
+POWER_MOVE: float = 80.0  # P_move in Watts
 POWER_HOVER: float = 100.0  # P_hover in Watts
 
 # Request Parameters
 NUM_SERVICES: int = 50  # S
 NUM_CONTENTS: int = 100  # K
 NUM_FILES: int = NUM_SERVICES + NUM_CONTENTS  # S + K
-CPU_CYCLES_PER_BYTE: np.ndarray = np.random.randint(500, 1500, size=NUM_SERVICES)  # omega_s_m
-FILE_SIZES: np.ndarray = np.random.randint(1_000, 1_000_000, size=NUM_FILES)  # 1KB to 1MB
-MIN_INPUT_SIZE: int = 1_000  # 1KB
-MAX_INPUT_SIZE: int = 1_000_000  # 1MB
-ZIPF_BETA: float = 0.8  # beta^Zipf
-K_CPU: float = 1e-9  # CPU capacitance coefficient
+CPU_CYCLES_PER_BYTE: np.ndarray = np.random.randint(2000, 4000, size=NUM_SERVICES)  # omega_s_m
+FILE_SIZES: np.ndarray = np.random.randint(10**5, 5 * 10**5, size=NUM_FILES)  # in bytes
+MIN_INPUT_SIZE: int = 1 * 10**5  # in bytes
+MAX_INPUT_SIZE: int = 5 * 10**5  # in bytes
+ZIPF_BETA: float = 0.6  # beta^Zipf
+K_CPU: float = 1e-27  # CPU capacitance coefficient
 
 # Caching Parameters
 T_CACHE_UPDATE_INTERVAL: int = 10  # T_cache
 GDSF_SMOOTHING_FACTOR: float = 0.5  # beta^gdsf
 
 # Communication Parameters
-G_CONSTS_PRODUCT: float = 2.2846 * 1e-3  # G_0 * g_0
-TRANSMIT_POWER: float = 0.1  # P in Watts
-AWGN: float = 1e-10  # sigma^2
-BANDWIDTH_INTER: int = 20 * 10**6  # B^inter in Hz
+G_CONSTS_PRODUCT: float = 2.2846 * 1.42 * 1e-4  # G_0 * g_0
+TRANSMIT_POWER: float = 0.5  # P in Watts
+AWGN: float = 1e-13  # sigma^2
+BANDWIDTH_INTER: int = 30 * 10**6  # B^inter in Hz
 BANDWIDTH_EDGE: int = 20 * 10**6  # B^edge in Hz
-BANDWIDTH_BACKHAUL: int = 50 * 10**6  # B^backhaul in Hz
+BANDWIDTH_BACKHAUL: int = 40 * 10**6  # B^backhaul in Hz
 
 # Model Parameters
 
@@ -79,7 +78,7 @@ OBS_DIM_SINGLE: int = 2 + NUM_FILES + (MAX_UAV_NEIGHBORS * (2 + NUM_FILES)) + (M
 
 ACTION_DIM: int = 2  # angle, distance from [-1, 1]
 STATE_DIM: int = NUM_UAVS * OBS_DIM_SINGLE
-MLP_HIDDEN_DIM: int = 160
+MLP_HIDDEN_DIM: int = 128
 
 ACTOR_LR: float = 0.002
 CRITIC_LR: float = 0.001
@@ -91,13 +90,14 @@ LOG_STD_MIN: float = -20  # minimum log standard deviation for stochastic polici
 EPSILON: float = 1e-9  # small value to prevent division by zero
 
 # Off-policy algorithm hyperparameters
-REPLAY_BUFFER_SIZE: int = 1_000_000  # B
-REPLAY_BATCH_SIZE: int = 32  # minibatch size
-INITIAL_RANDOM_STEPS: int = 10  # steps of random actions for exploration
+REPLAY_BUFFER_SIZE: int = 10**6  # B
+REPLAY_BATCH_SIZE: int = 64  # minibatch size
+INITIAL_RANDOM_STEPS: int = 500  # steps of random actions for exploration
+LEARN_FREQ: int = 5  # steps to learn after
 
 # Gaussian Noise Parameters (for MADDPG and MATD3)
-INITIAL_NOISE_SCALE: float = 1.0
-MIN_NOISE_SCALE: float = 0.1
+INITIAL_NOISE_SCALE: float = 0.1
+MIN_NOISE_SCALE: float = 0.01
 NOISE_DECAY_RATE: float = 0.995
 
 # MATD3 Specific Hyperparameters

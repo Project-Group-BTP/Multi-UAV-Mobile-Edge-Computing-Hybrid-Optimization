@@ -16,7 +16,7 @@ from datetime import datetime
 def start_training(args: argparse.Namespace):
     timestamp: str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     print(f"\n🚀 Training started at {timestamp} for {args.num_episodes} episodes\n")
-    logger: Logger = Logger(timestamp, "train_logs", f"logs_{timestamp}.txt", f"log_data_{timestamp}.json", f"config_{timestamp}.json")
+    logger: Logger = Logger("train_logs", timestamp)
     resume_training: bool = args.resume_path is not None
     if resume_training:
         if args.config_path is None:
@@ -56,7 +56,7 @@ def start_training(args: argparse.Namespace):
 def start_testing(args: argparse.Namespace):
     timestamp: str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     print(f"\n🚀 Testing started at {timestamp} for {args.num_episodes} episodes\n")
-    logger: Logger = Logger(timestamp, "test_logs", f"logs_{timestamp}.txt", f"log_data_{timestamp}.json", f"config_{timestamp}.json")
+    logger: Logger = Logger("test_logs", timestamp)
     logger.load_configs(args.config_path)
 
     np.random.seed(config.SEED)
