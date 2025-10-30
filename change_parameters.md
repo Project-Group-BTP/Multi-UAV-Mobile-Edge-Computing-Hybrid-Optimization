@@ -9,7 +9,7 @@ NOTE : Please do try to design a better reward function and improve algorithms/m
 - MBS_POS : Change MBS position to see its effect on performance
 - **(IMP)** NUM_UAVS and NUM_UES : Study effect of varying number of UAVs and users
 
-- **(IMP)** Try varying starting positions of UAVs and UEs, like concentrating UEs around some hotspots
+- **(IMP)** Try varying starting positions of UAVs and UEs, like concentrating UEs around **some hotspots**
 
 - UAV_STORAGE_CAPACITY and UAV_COMPUTING_CAPACITY : Vary capacity to see their effect on latency
 - **(IMP)** NUM_SERVICES, NUM_CONTENTS : Vary number of services and contents to simulate different scenarios. Also vary their popularity distribution (can try something different from Zipf)

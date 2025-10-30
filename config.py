@@ -32,7 +32,7 @@ assert UAV_SENSING_RANGE >= MIN_UAV_SEPARATION
 
 # Collision Avoidance and Penalties
 COLLISION_AVOIDANCE_ITERATIONS: int = 20  # number of iterations to resolve collisions
-COLLISION_PENALTY: float = 100.0  # penalty per collision
+COLLISION_PENALTY: float = 10.0  # penalty per collision
 BOUNDARY_PENALTY: float = 50.0  # penalty for going out of bounds
 # IMPORTANT : Reconfigurable, should try for various values including : NUM_UAVS - 1 and NUM_UES
 MAX_UAV_NEIGHBORS: int = min(5, NUM_UAVS - 1)

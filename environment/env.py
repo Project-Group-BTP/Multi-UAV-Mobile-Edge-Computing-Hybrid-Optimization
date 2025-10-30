@@ -72,6 +72,7 @@ class Env:
         for uav in self._uavs:
             uav.set_current_requested_files()
             uav.set_neighbors(self._uavs)
+        for uav in self._uavs:
             uav.select_collaborator()
         for uav in self._uavs:
             uav.set_freq_counts()

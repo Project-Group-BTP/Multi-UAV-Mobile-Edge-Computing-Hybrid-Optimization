@@ -103,15 +103,16 @@ class UAV:
             return
 
         best_collaborators: list[UAV] = []
-        max_overlap: int = -1
+        missing_requested_files: np.ndarray = self._current_requested_files & (~self.cache)
+        max_missing_overlap: int = -1
 
         # Find neighbors with maximum overlap
         for neighbor in self._neighbors:
-            overlap: int = int(np.sum(self._current_requested_files & neighbor.cache))
-            if overlap > max_overlap:
-                max_overlap = overlap
+            overlap: int = int(np.sum(missing_requested_files & neighbor.cache))
+            if overlap > max_missing_overlap:
+                max_missing_overlap = overlap
                 best_collaborators = [neighbor]
-            elif overlap == max_overlap:
+            elif overlap == max_missing_overlap:
                 best_collaborators.append(neighbor)
 
         # If only one best collaborator, select it
