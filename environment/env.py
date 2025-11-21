@@ -110,19 +110,30 @@ class Env:
         """Calculates next positions and resolves potential collisions iteratively."""
         current_positions: np.ndarray = np.array([uav.pos[:2] for uav in self._uavs])
         max_dist: float = config.UAV_SPEED * config.TIME_SLOT_DURATION
-        angles: np.ndarray = (actions[:, 0] + 1) * np.pi  # from [-1, 1] to [0, 2π]
-        distances: np.ndarray = (actions[:, 1] + 1) / 2 * max_dist  # from [-1, 1] to [0, max_dist]
 
-        delta_pos: np.ndarray = np.stack((distances * np.cos(angles), distances * np.sin(angles)), axis=1)
+        # Interpret actions as a direct (x, y) vector
+        delta_vec_raw: np.ndarray = actions
+
+        # Calculate the magnitude (distance) of this raw vector
+        raw_magnitude: np.ndarray = np.linalg.norm(delta_vec_raw, axis=1, keepdims=True)
+
+        # Clip the magnitude to be at most 1.0
+        clipped_magnitude: np.ndarray = np.minimum(raw_magnitude, 1.0)
+        distances: np.ndarray = clipped_magnitude * max_dist
+        directions: np.ndarray = delta_vec_raw / (raw_magnitude + config.EPSILON)
+        delta_pos: np.ndarray = directions * distances
+
         proposed_positions: np.ndarray = current_positions + delta_pos
 
+        min_boundary_gap: float = config.UAV_COVERAGE_RADIUS / 2.0
         for i, uav in enumerate(self._uavs):
-            if not (0 <= proposed_positions[i, 0] < config.AREA_WIDTH and 0 <= proposed_positions[i, 1] < config.AREA_HEIGHT):
+            if not (min_boundary_gap <= proposed_positions[i, 0] <= config.AREA_WIDTH - min_boundary_gap and min_boundary_gap <= proposed_positions[i, 1] <= config.AREA_HEIGHT - min_boundary_gap):
                 uav.boundary_violation = True
-        next_positions: np.ndarray = np.clip(proposed_positions, 0, [config.AREA_WIDTH, config.AREA_HEIGHT])
+        next_positions: np.ndarray = np.clip(proposed_positions, [min_boundary_gap, min_boundary_gap], [config.AREA_WIDTH - min_boundary_gap, config.AREA_HEIGHT - min_boundary_gap])
 
         min_sep_sq: float = config.MIN_UAV_SEPARATION**2
         for _ in range(config.COLLISION_AVOIDANCE_ITERATIONS + 1):
+            collision_detected_in_iter: bool = False
             for i in range(config.NUM_UAVS):
                 for j in range(i + 1, config.NUM_UAVS):
                     pos_i: np.ndarray = next_positions[i]
@@ -130,13 +141,17 @@ class Env:
                     dist_sq: float = np.sum((pos_i - pos_j) ** 2)
                     if dist_sq < min_sep_sq:
                         self._uavs[i].collision_violation = True
+                        self._uavs[j].collision_violation = True
+                        collision_detected_in_iter = True
                         dist: float = np.sqrt(dist_sq) if dist_sq > 0 else config.EPSILON
                         overlap: float = config.MIN_UAV_SEPARATION - dist
                         direction: np.ndarray = (pos_i - pos_j) / dist
                         next_positions[i] += direction * overlap * 0.5
                         next_positions[j] -= direction * overlap * 0.5
+            if not collision_detected_in_iter:
+                break
 
-        final_positions: np.ndarray = np.clip(next_positions, 0, [config.AREA_WIDTH, config.AREA_HEIGHT])
+        final_positions: np.ndarray = np.clip(next_positions, [min_boundary_gap, min_boundary_gap], [config.AREA_WIDTH - min_boundary_gap, config.AREA_HEIGHT - min_boundary_gap])
         for i, uav in enumerate(self._uavs):
             uav.update_position(final_positions[i])
 
@@ -157,7 +172,8 @@ class Env:
 
     def _get_rewards_and_metrics(self) -> tuple[list[float], tuple[float, float, float]]:
         """Returns the reward and other metrics."""
-        total_latency: float = sum(ue.latency_current_request for ue in self._ues)
+        covered_ues: int = sum(1 for ue in self._ues if ue.assigned)
+        total_latency: float = sum(ue.latency_current_request for ue in self._ues) / covered_ues if covered_ues > 0 else 0.0
         total_energy: float = sum(uav.energy for uav in self._uavs)
         sc_metrics: np.ndarray = np.array([ue.service_coverage for ue in self._ues if ue.service_coverage > 0])
         jfi: float = 0.0
