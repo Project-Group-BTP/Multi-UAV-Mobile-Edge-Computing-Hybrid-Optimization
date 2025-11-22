@@ -4,6 +4,8 @@ from marl_models.utils import save_models
 from environment.env import Env
 from utils.logger import Logger, Log
 from utils.plot_snapshots import plot_snapshot
+
+# from utils.plot_snapshots import update_trajectories, reset_trajectories  # trajectory tracking, comment if not needed
 import config
 import torch
 import numpy as np
@@ -31,6 +33,7 @@ def train_on_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: in
         rollout_latency: float = 0.0
         rollout_energy: float = 0.0
         rollout_fairness: float = 0.0
+        # reset_trajectories(env)  # tracking code, comment if not needed
         plot_snapshot(env, update, 0, logger.log_dir, "update", logger.timestamp, True)
 
         for step in range(1, config.PPO_ROLLOUT_LENGTH + 1):
@@ -41,6 +44,7 @@ def train_on_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: in
             actions, log_probs, value = model.get_action_and_value(obs_arr, state)
 
             next_obs, rewards, (total_latency, total_energy, jfi) = env.step(actions)
+            # update_trajectories(env)  # tracking code, comment if not needed
             next_state: np.ndarray = np.concatenate(next_obs, axis=0)
             done: bool = step >= config.PPO_ROLLOUT_LENGTH
             buffer.add(state, obs_arr, actions, log_probs, rewards, done, value)
@@ -90,6 +94,7 @@ def train_off_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: i
         episode_latency: float = 0.0
         episode_energy: float = 0.0
         episode_fairness: float = 0.0
+        # reset_trajectories(env)  # tracking code, comment if not needed
         plot_snapshot(env, episode, 0, logger.log_dir, "episode", logger.timestamp, True)
 
         for step in range(1, config.STEPS_PER_EPISODE + 1):
@@ -103,6 +108,7 @@ def train_off_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: i
                 actions = model.select_actions(obs, exploration=True)
 
             next_obs, rewards, (total_latency, total_energy, jfi) = env.step(actions)
+            # update_trajectories(env)  # tracking code, comment if not needed
             done: bool = step >= config.STEPS_PER_EPISODE
             buffer.add(obs, actions, rewards, next_obs, done)
 
@@ -139,6 +145,7 @@ def train_random(env: Env, model: MARLModel, logger: Logger, num_episodes: int) 
         episode_latency: float = 0.0
         episode_energy: float = 0.0
         episode_fairness: float = 0.0
+        # reset_trajectories(env)  # tracking code, comment if not needed
         plot_snapshot(env, episode, 0, logger.log_dir, "episode", logger.timestamp, True)
 
         for step in range(1, config.STEPS_PER_EPISODE + 1):
@@ -147,6 +154,7 @@ def train_random(env: Env, model: MARLModel, logger: Logger, num_episodes: int) 
 
             actions: np.ndarray = model.select_actions(obs, exploration=False)
             next_obs, rewards, (total_latency, total_energy, jfi) = env.step(actions)
+            # update_trajectories(env)  # tracking code, comment if not needed
             done: bool = step >= config.STEPS_PER_EPISODE
             obs = next_obs
 

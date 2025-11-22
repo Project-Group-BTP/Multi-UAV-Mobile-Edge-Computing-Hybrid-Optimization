@@ -32,16 +32,17 @@ assert UAV_SENSING_RANGE >= MIN_UAV_SEPARATION
 
 # Collision Avoidance and Penalties
 COLLISION_AVOIDANCE_ITERATIONS: int = 20  # number of iterations to resolve collisions
-COLLISION_PENALTY: float = 10.0  # penalty per collision
-BOUNDARY_PENALTY: float = 50.0  # penalty for going out of bounds
+COLLISION_PENALTY: float = 100.0  # penalty per collision
+BOUNDARY_PENALTY: float = 100.0  # penalty for going out of bounds
+NON_SERVED_LATENCY_PENALTY: float = 20.0  # penalty in latency for non-served requests
 # IMPORTANT : Reconfigurable, should try for various values including : NUM_UAVS - 1 and NUM_UES
 MAX_UAV_NEIGHBORS: int = min(5, NUM_UAVS - 1)
 MAX_ASSOCIATED_UES: int = min(30, NUM_UES // NUM_UAVS + 10)
 assert MAX_UAV_NEIGHBORS >= 1 and MAX_UAV_NEIGHBORS <= NUM_UAVS - 1
 assert MAX_ASSOCIATED_UES >= 1 and MAX_ASSOCIATED_UES <= NUM_UES
 
-POWER_MOVE: float = 80.0  # P_move in Watts
-POWER_HOVER: float = 100.0  # P_hover in Watts
+POWER_MOVE: float = 100.0  # P_move in Watts
+POWER_HOVER: float = 80.0  # P_hover in Watts
 
 # Request Parameters
 NUM_SERVICES: int = 50  # S
@@ -68,20 +69,20 @@ BANDWIDTH_BACKHAUL: int = 40 * 10**6  # B^backhaul in Hz
 
 # Model Parameters
 
-ALPHA_1 = 0.4  # for latency
-ALPHA_2 = 0.4  # for energy
-ALPHA_3 = 0.2  # for fairness
-assert round(ALPHA_1 + ALPHA_2 + ALPHA_3, 3) == 1.0
+ALPHA_1 = 8.0  # weightage for latency
+ALPHA_2 = 1.0  # weightage for energy
+ALPHA_3 = 4.0  # weightage for fairness
+REWARD_SCALING_FACTOR: float = 0.01  # scaling factor for rewards
 
 OBS_DIM_SINGLE: int = 2 + NUM_FILES + (MAX_UAV_NEIGHBORS * (2 + NUM_FILES)) + (MAX_ASSOCIATED_UES * (2 + 3))
 # own state: pos (2) + cache (NUM_FILES) + Neighbors: pos (2) + cache (NUM_FILES) + UEs: pos (2) + request_tuple (3)
 
 ACTION_DIM: int = 2  # angle, distance from [-1, 1]
 STATE_DIM: int = NUM_UAVS * OBS_DIM_SINGLE
-MLP_HIDDEN_DIM: int = 128
+MLP_HIDDEN_DIM: int = 256
 
-ACTOR_LR: float = 0.002
-CRITIC_LR: float = 0.001
+ACTOR_LR: float = 3e-4
+CRITIC_LR: float = 3e-4
 DISCOUNT_FACTOR: float = 0.99  # gamma
 UPDATE_FACTOR: float = 0.01  # tau
 MAX_GRAD_NORM: float = 0.5  # maximum norm for gradient clipping to prevent exploding gradients
@@ -92,7 +93,7 @@ EPSILON: float = 1e-9  # small value to prevent division by zero
 # Off-policy algorithm hyperparameters
 REPLAY_BUFFER_SIZE: int = 10**6  # B
 REPLAY_BATCH_SIZE: int = 64  # minibatch size
-INITIAL_RANDOM_STEPS: int = 500  # steps of random actions for exploration
+INITIAL_RANDOM_STEPS: int = 5000  # steps of random actions for exploration
 LEARN_FREQ: int = 5  # steps to learn after
 
 # Gaussian Noise Parameters (for MADDPG and MATD3)

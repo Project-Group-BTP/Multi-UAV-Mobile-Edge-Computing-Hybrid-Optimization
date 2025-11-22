@@ -2,8 +2,41 @@ from environment.env import Env
 import config
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
+
+# from matplotlib import colormaps as cm  # trajectory tracking code, comment if not needed
 import os
 import numpy as np
+
+
+# Trajectory tracking code, comment if not needed
+# class TrajectoryTracker:
+#     def __init__(self) -> None:
+#         self.paths: dict[int, list[np.ndarray]] = {}
+
+#     def update(self, env: Env) -> None:
+#         for uav in env.uavs:
+#             if uav.id not in self.paths:
+#                 self.paths[uav.id] = []
+#             self.paths[uav.id].append(uav.pos.copy())
+
+#     def reset(self, env: Env) -> None:
+#         self.paths = {}
+#         self.update(env)
+
+#     def get_path(self, uav_id: int) -> np.ndarray:
+#         return np.array(self.paths.get(uav_id, []))
+
+
+# # Global tracker instance
+# tracker = TrajectoryTracker()
+
+
+# def update_trajectories(env: Env) -> None:
+#     tracker.update(env)
+
+
+# def reset_trajectories(env: Env) -> None:
+#     tracker.reset(env)
 
 
 def plot_snapshot(env: Env, progress_step: int, step: int, save_dir: str, name: str, timestamp: str, initial: bool = False) -> None:
@@ -22,6 +55,14 @@ def plot_snapshot(env: Env, progress_step: int, step: int, save_dir: str, name: 
     # Plot UEs as blue dots
     ue_positions: np.ndarray = np.array([ue.pos for ue in env.ues])
     ax.scatter(ue_positions[:, 0], ue_positions[:, 1], c="blue", marker=".", label="UEs")
+
+    # Plot UAV trajectories, comment if not needed
+    # cmap = cm["plasma"]
+    # colors = cmap(np.linspace(0, 1, len(env.uavs)))
+    # for uav, color in zip(env.uavs, colors):
+    #     path = tracker.get_path(uav.id)
+    #     if len(path) > 1:
+    #         ax.plot(path[:, 0], path[:, 1], color=color, linestyle="-", linewidth=1.5, alpha=0.7)
 
     # Plot UAVs and their connections
     for uav in env.uavs:
@@ -52,3 +93,5 @@ def plot_snapshot(env: Env, progress_step: int, step: int, save_dir: str, name: 
         plt.savefig(f"{save_path}/step_{step:04d}.png")
 
     plt.close(fig)
+
+    # reset_trajectories(env)  # tracking code, comment if not needed
