@@ -13,6 +13,8 @@ Currently included MARL models:
 - MASAC (Multi-Agent Soft Actor-Critic)
 - Random baseline
 
+![System Model](docs/system_model.jpg)
+
 Directory Structure:
 
 ```
