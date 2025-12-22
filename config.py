@@ -27,10 +27,12 @@ UAV_COMPUTING_CAPACITY: np.ndarray = np.random.choice(np.arange(5 * 10**9, 20 * 
 UAV_SENSING_RANGE: float = 300.0  # R^sense in meters
 UAV_COVERAGE_RADIUS: float = 100.0  # R in meters
 MIN_UAV_SEPARATION: float = 200.0  # d_min in meters
+assert np.all(UAV_STORAGE_CAPACITY > 0)
+assert np.all(UAV_COMPUTING_CAPACITY > 0)
 assert UAV_COVERAGE_RADIUS * 2 <= MIN_UAV_SEPARATION
 assert UAV_SENSING_RANGE >= MIN_UAV_SEPARATION
 
-# Collision Avoidance and Penalties
+# Collisions and Penalties
 COLLISION_AVOIDANCE_ITERATIONS: int = 20  # number of iterations to resolve collisions
 COLLISION_PENALTY: float = 100.0  # penalty per collision
 BOUNDARY_PENALTY: float = 100.0  # penalty for going out of bounds
@@ -59,13 +61,17 @@ K_CPU: float = 1e-27  # CPU capacitance coefficient
 T_CACHE_UPDATE_INTERVAL: int = 10  # T_cache
 GDSF_SMOOTHING_FACTOR: float = 0.5  # beta^gdsf
 
+# Probabilistic Caching Parameters
+AVG_FILE_SIZE: float = float(np.mean(FILE_SIZES))
+PROB_GAMMA: float = 0.5  # gamma
+
 # Communication Parameters
 G_CONSTS_PRODUCT: float = 2.2846 * 1.42 * 1e-4  # G_0 * g_0
 TRANSMIT_POWER: float = 0.5  # P in Watts
 AWGN: float = 1e-13  # sigma^2
 BANDWIDTH_INTER: int = 30 * 10**6  # B^inter in Hz
 BANDWIDTH_EDGE: int = 20 * 10**6  # B^edge in Hz
-BANDWIDTH_BACKHAUL: int = 40 * 10**6  # B^backhaul in Hz
+BANDWIDTH_BACKHAUL: int = 15 * 10**6  # B^backhaul in Hz
 
 # Model Parameters
 
@@ -74,8 +80,8 @@ ALPHA_2 = 1.0  # weightage for energy
 ALPHA_3 = 4.0  # weightage for fairness
 REWARD_SCALING_FACTOR: float = 0.01  # scaling factor for rewards
 
-OBS_DIM_SINGLE: int = 2 + NUM_FILES + (MAX_UAV_NEIGHBORS * (2 + NUM_FILES)) + (MAX_ASSOCIATED_UES * (2 + 3))
-# own state: pos (2) + cache (NUM_FILES) + Neighbors: pos (2) + cache (NUM_FILES) + UEs: pos (2) + request_tuple (3)
+OBS_DIM_SINGLE: int = 2 + NUM_FILES + (MAX_UAV_NEIGHBORS * 2) + (MAX_ASSOCIATED_UES * (2 + 3))
+# own state: pos (2) + cache (NUM_FILES) + Neighbors: pos (2) + UEs: pos (2) + request_tuple (3)
 
 ACTION_DIM: int = 2  # angle, distance from [-1, 1]
 STATE_DIM: int = NUM_UAVS * OBS_DIM_SINGLE

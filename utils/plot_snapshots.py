@@ -4,8 +4,8 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
 
 # from matplotlib import colormaps as cm  # trajectory tracking code, comment if not needed
-import os
 import numpy as np
+import os
 
 
 # Trajectory tracking code, comment if not needed
@@ -41,7 +41,7 @@ import numpy as np
 
 def plot_snapshot(env: Env, progress_step: int, step: int, save_dir: str, name: str, timestamp: str, initial: bool = False) -> None:
     """Generates and saves a plot of the current environment state."""
-    save_path = f"{save_dir}/state_images_{timestamp}/{name}_{progress_step:04d}"
+    save_path: str = f"{save_dir}/state_images_{timestamp}/{name}_{progress_step:04d}"
     if not os.path.exists(save_path):
         os.makedirs(save_path)
     fig, ax = plt.subplots(figsize=(12, 12))
@@ -52,9 +52,15 @@ def plot_snapshot(env: Env, progress_step: int, step: int, save_dir: str, name: 
     ax.set_xlabel("X coordinate (m)")
     ax.set_ylabel("Y coordinate (m)")
 
-    # Plot UEs as blue dots
-    ue_positions: np.ndarray = np.array([ue.pos for ue in env.ues])
-    ax.scatter(ue_positions[:, 0], ue_positions[:, 1], c="blue", marker=".", label="UEs")
+    # Plot UEs
+    service_ues_pos: np.ndarray = np.array([ue.pos for ue in env.ues if ue.current_request[0] == 0])
+    content_ues_pos: np.ndarray = np.array([ue.pos for ue in env.ues if ue.current_request[0] == 1])
+
+    if service_ues_pos.size > 0:
+        ax.scatter(service_ues_pos[:, 0], service_ues_pos[:, 1], c="blue", marker=".", alpha=0.6, label="UE (Service Req)")
+
+    if content_ues_pos.size > 0:
+        ax.scatter(content_ues_pos[:, 0], content_ues_pos[:, 1], c="green", marker=".", alpha=0.6, label="UE (Content Req)")
 
     # Plot UAV trajectories, comment if not needed
     # cmap = cm["plasma"]
@@ -64,27 +70,26 @@ def plot_snapshot(env: Env, progress_step: int, step: int, save_dir: str, name: 
     #     if len(path) > 1:
     #         ax.plot(path[:, 0], path[:, 1], color=color, linestyle="-", linewidth=1.5, alpha=0.7)
 
+    plotted_labels: set = set()
+
     # Plot UAVs and their connections
     for uav in env.uavs:
         # UAV position (red square)
-        ax.scatter(uav.pos[0], uav.pos[1], c="red", marker="s", s=100, label=f"UAV" if uav.id == 0 else "")
+        lbl = "UAV" if "UAV" not in plotted_labels else ""
+        ax.scatter(uav.pos[0], uav.pos[1], c="red", marker="s", s=100, label=lbl, zorder=5)
+        plotted_labels.add("UAV")
 
         # UAV coverage radius
-        coverage_circle: Circle = Circle((uav.pos[0], uav.pos[1]), config.UAV_COVERAGE_RADIUS, color="red", alpha=0.1)
+        coverage_circle: Circle = Circle((uav.pos[0], uav.pos[1]), config.UAV_COVERAGE_RADIUS, color="red", alpha=0.1, label="Service Range" if "Service Range" not in plotted_labels else "")
         ax.add_patch(coverage_circle)
+        plotted_labels.add("Service Range")
 
         # Lines to covered UEs (green)
         for ue in uav.current_covered_ues:
-            ax.plot([uav.pos[0], ue.pos[0]], [uav.pos[1], ue.pos[1]], "g-", lw=0.5, label="UE Association" if "ue_assoc" not in plt.gca().get_legend_handles_labels()[1] else "")
-
-        # Line to collaborator (dashed magenta)
-        if uav.current_collaborator:
-            ax.plot([uav.pos[0], uav.current_collaborator.pos[0]], [uav.pos[1], uav.current_collaborator.pos[1]], "m--", lw=1.0, label="UAV Collaboration")
-
-    # Create a clean legend
-    handles, labels = ax.get_legend_handles_labels()
-    by_label: dict = dict(zip(labels, handles))
-    ax.legend(by_label.values(), by_label.keys(), loc="upper right")
+            lbl = "UE Association" if "UE Association" not in plotted_labels else ""
+            ax.plot([uav.pos[0], ue.pos[0]], [uav.pos[1], ue.pos[1]], "g-", lw=0.5, alpha=0.5, label=lbl)
+            plotted_labels.add("UE Association")
+    ax.legend(loc="upper right", fontsize="small", framealpha=0.9)
 
     # Save the figure
     if initial:

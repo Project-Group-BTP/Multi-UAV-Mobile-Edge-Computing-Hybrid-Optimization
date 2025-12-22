@@ -32,6 +32,9 @@ class Env:
         self._time_step += 1
 
         for uav in self._uavs:
+            uav.calculate_initial_load()
+
+        for uav in self._uavs:
             uav.process_requests()
 
         for ue in self._ues:
@@ -70,12 +73,7 @@ class Env:
             ue.generate_request()
         self._associate_ues_to_uavs()
         for uav in self._uavs:
-            uav.set_current_requested_files()
             uav.set_neighbors(self._uavs)
-        for uav in self._uavs:
-            uav.select_collaborator()
-        for uav in self._uavs:
-            uav.set_freq_counts()
 
         all_obs: list[np.ndarray] = []
         for uav in self._uavs:
@@ -84,13 +82,12 @@ class Env:
             own_cache: np.ndarray = uav.cache.astype(np.float32)
             own_state: np.ndarray = np.concatenate([own_pos, own_cache])
 
-            # Part 2: Neighbors state (positions and cache status)
-            neighbor_states: np.ndarray = np.zeros((config.MAX_UAV_NEIGHBORS, 2 + config.NUM_FILES))
+            # Part 2: Neighbor positions
+            neighbor_states: np.ndarray = np.zeros((config.MAX_UAV_NEIGHBORS, 2))
             neighbors: list[UAV] = sorted(uav.neighbors, key=lambda n: float(np.linalg.norm(uav.pos - n.pos)))[: config.MAX_UAV_NEIGHBORS]
             for i, neighbor in enumerate(neighbors):
                 relative_pos: np.ndarray = (neighbor.pos[:2] - uav.pos[:2]) / config.UAV_SENSING_RANGE
-                neighbor_cache: np.ndarray = neighbor.cache.astype(np.float32)
-                neighbor_states[i, :] = np.concatenate([relative_pos, neighbor_cache])
+                neighbor_states[i, :] = relative_pos
 
             # Part 3: State of associated UEs
             ue_states: np.ndarray = np.zeros((config.MAX_ASSOCIATED_UES, 2 + 3))

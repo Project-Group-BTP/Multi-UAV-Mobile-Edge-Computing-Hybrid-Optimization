@@ -50,7 +50,6 @@ Directory Structure:
 ├── train.py
 ├── test.py
 ├── main.py
-├── visualize.py
 ├── requirements.txt
 ├── README.md
 ├── .gitignore
@@ -92,12 +91,6 @@ To test a saved model, you must provide the path to the model's directory and it
 ```bash
 # Start testing, with saved model path and config file saved during that model's training run (to load and use the same settings).
 python main.py test --num_episodes=<total_episodes> --model_path="<path_to_model_directory>" --config_path="<path_to_saved_config>"
-```
-
-A temporary script to run the environment with random actions and visualize the state for just testing the environment alone. Run using:
-
-```bash
-python visualize.py
 ```
 
 **PS: Currently under rapid development and may be subject to significant changes.**
