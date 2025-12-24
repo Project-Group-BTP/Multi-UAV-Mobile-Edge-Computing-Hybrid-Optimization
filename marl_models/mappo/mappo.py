@@ -8,7 +8,15 @@ from torch.distributions import Normal
 
 
 class MAPPO(MARLModel):
-    def __init__(self, model_name: str, num_agents: int, obs_dim: int, action_dim: int, state_dim: int, device: str) -> None:
+    def __init__(
+        self,
+        model_name: str,
+        num_agents: int,
+        obs_dim: int,
+        action_dim: int,
+        state_dim: int,
+        device: str,
+    ) -> None:
         super().__init__(model_name, num_agents, obs_dim, action_dim, device)
         self.state_dim: int = state_dim
 
@@ -25,7 +33,7 @@ class MAPPO(MARLModel):
         with torch.no_grad():
             dist: Normal = self.actors(obs_tensor)
             if exploration:
-                actions: torch.Tensor = dist.sample()  # Stochastic actions for exploration
+                actions: torch.Tensor = (dist.sample())  # Stochastic actions for exploration
             else:
                 actions = dist.mean  # Deterministic actions for evaluation
 
@@ -49,7 +57,7 @@ class MAPPO(MARLModel):
         clipped_actions: np.ndarray = np.clip(actions.cpu().numpy(), -1.0, 1.0)
         return clipped_actions, log_probs.cpu().numpy(), values.cpu().numpy()
 
-    def update(self, batch: ExperienceBatch) -> None:
+    def update(self, batch: ExperienceBatch) -> dict:
         assert isinstance(batch, dict), "MAPPO expects OnPolicyExperienceBatch (dict)"
         obs_batch: torch.Tensor = batch["obs"]
         actions_batch: torch.Tensor = batch["actions"]
@@ -77,7 +85,7 @@ class MAPPO(MARLModel):
 
         # PPO surrogate loss
         surr1: torch.Tensor = ratio * advantages_batch
-        surr2: torch.Tensor = torch.clamp(ratio, 1.0 - config.PPO_CLIP_EPS, 1.0 + config.PPO_CLIP_EPS) * advantages_batch
+        surr2: torch.Tensor = (torch.clamp(ratio, 1.0 - config.PPO_CLIP_EPS, 1.0 + config.PPO_CLIP_EPS) * advantages_batch)
         actor_loss: torch.Tensor = -torch.min(surr1, surr2).mean()
 
         # Adding entropy bonus for exploration
@@ -95,6 +103,13 @@ class MAPPO(MARLModel):
         critic_loss.backward()
         torch.nn.utils.clip_grad_norm_(self.critics.parameters(), config.MAX_GRAD_NORM)
         self.critic_optimizer.step()
+
+        # Return losses for logging
+        return {
+            "actor": float(actor_loss.detach().item()),
+            "critic": float(critic_loss.detach().item()),
+            "entropy": float(entropy_loss.detach().item()),
+        }
 
     def reset(self) -> None:
         pass  # Nothing to reset

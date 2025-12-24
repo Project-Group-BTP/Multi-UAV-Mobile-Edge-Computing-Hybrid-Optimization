@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 import numpy as np
 import torch
+from typing import Any, Dict, Optional
 
 OffPolicyExperienceBatch = tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]
 OnPolicyExperienceBatch = dict[str, torch.Tensor]
@@ -36,7 +37,7 @@ class MARLModel(ABC):
         pass
 
     @abstractmethod
-    def update(self, batch: ExperienceBatch) -> None:
+    def update(self, batch: ExperienceBatch) -> Optional[Dict[str, Any]]:
         """
         Performs a learning update on the model's networks using a batch of experiences.
 
