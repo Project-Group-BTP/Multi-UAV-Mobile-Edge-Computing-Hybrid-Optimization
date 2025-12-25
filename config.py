@@ -67,21 +67,29 @@ PROB_GAMMA: float = 0.5  # gamma
 
 # Communication Parameters
 G_CONSTS_PRODUCT: float = 2.2846 * 1.42 * 1e-4  # G_0 * g_0
-TRANSMIT_POWER: float = 0.5  # P in Watts
+TRANSMIT_POWER: float = 0.5  # P^comm in Watts
 AWGN: float = 1e-13  # sigma^2
 BANDWIDTH_INTER: int = 30 * 10**6  # B^inter in Hz
 BANDWIDTH_EDGE: int = 20 * 10**6  # B^edge in Hz
 BANDWIDTH_BACKHAUL: int = 15 * 10**6  # B^backhaul in Hz
+
+# WPT Parameters
+UE_BATTERY_CAPACITY: float = 50.0  # B_max in Joules
+UE_CRITICAL_THRESHOLD: float = 0.15 * UE_BATTERY_CAPACITY  # B_low in Joules
+WPT_TRANSMIT_POWER: float = 50.0  # P^WPT in Watts
+WPT_EFFICIENCY: float = 0.5  # eta (energy harvesting efficiency)
+UE_STATIC_POWER: float = 0.01  # Idle power consumption
 
 # Model Parameters
 
 ALPHA_1 = 8.0  # weightage for latency
 ALPHA_2 = 1.0  # weightage for energy
 ALPHA_3 = 4.0  # weightage for fairness
+ALPHA_4 = 4.0  # weightage for offline rate
 REWARD_SCALING_FACTOR: float = 0.01  # scaling factor for rewards
 
-OBS_DIM_SINGLE: int = 2 + NUM_FILES + (MAX_UAV_NEIGHBORS * 2) + (MAX_ASSOCIATED_UES * (2 + 3))
-# own state: pos (2) + cache (NUM_FILES) + Neighbors: pos (2) + UEs: pos (2) + request_tuple (3)
+OBS_DIM_SINGLE: int = 2 + NUM_FILES + (MAX_UAV_NEIGHBORS * 2) + (MAX_ASSOCIATED_UES * (2 + 3 + 1))
+# own state: pos (2) + cache (NUM_FILES) + Neighbors: pos (2) + UEs: pos (2) + request_tuple (3) + battery level (1)
 
 ACTION_DIM: int = 2  # angle, distance from [-1, 1]
 STATE_DIM: int = NUM_UAVS * OBS_DIM_SINGLE

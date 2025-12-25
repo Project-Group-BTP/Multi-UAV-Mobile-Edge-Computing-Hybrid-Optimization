@@ -25,6 +25,7 @@ class UE:
     def __init__(self, ue_id: int) -> None:
         self.id: int = ue_id
         self.pos: np.ndarray = np.array([np.random.uniform(0, config.AREA_WIDTH), np.random.uniform(0, config.AREA_HEIGHT), 0.0])
+        self.battery_level: float = config.UE_BATTERY_CAPACITY  # Start at full capacity
 
         self.current_request: tuple[int, int, int] = (0, 0, 0)  # Request : (req_type, req_size, req_id)
         self.latency_current_request: float = 0.0  # Latency for the current request
@@ -57,6 +58,14 @@ class UE:
 
     def generate_request(self) -> None:
         """Generates a new request tuple for the current time slot."""
+
+        # Check for Emergency Energy Request
+        if self.battery_level < config.UE_CRITICAL_THRESHOLD:
+            self.current_request = (2, 0, 0)
+            self.latency_current_request = 0.0
+            self.assigned = False
+            return
+
         # Determine request type: 0=service, 1=content
         req_type: int = np.random.choice([0, 1])
 
@@ -88,3 +97,10 @@ class UE:
         """Set a new destination, speed, and wait time as per the Random Waypoint model."""
         self._waypoint = np.array([np.random.uniform(0, config.AREA_WIDTH), np.random.uniform(0, config.AREA_HEIGHT)])
         self._wait_time = np.random.randint(0, config.UE_MAX_WAIT_TIME + 1)
+
+    def update_battery(self, harv_energy: float, ue_transmit_time: float) -> None:
+        """Updates battery level based on consumption and harvesting."""
+        consumed_energy: float = config.UE_STATIC_POWER * config.TIME_SLOT_DURATION
+        consumed_energy += config.TRANSMIT_POWER * ue_transmit_time
+        self.battery_level = min(config.UE_BATTERY_CAPACITY, self.battery_level - consumed_energy + harv_energy)
+        self.battery_level = max(0.0, self.battery_level)

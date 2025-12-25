@@ -55,12 +55,16 @@ def plot_snapshot(env: Env, progress_step: int, step: int, save_dir: str, name: 
     # Plot UEs
     service_ues_pos: np.ndarray = np.array([ue.pos for ue in env.ues if ue.current_request[0] == 0])
     content_ues_pos: np.ndarray = np.array([ue.pos for ue in env.ues if ue.current_request[0] == 1])
+    energy_ues_pos: np.ndarray = np.array([ue.pos for ue in env.ues if ue.current_request[0] == 2])
 
     if service_ues_pos.size > 0:
         ax.scatter(service_ues_pos[:, 0], service_ues_pos[:, 1], c="blue", marker=".", alpha=0.6, label="UE (Service Req)")
 
     if content_ues_pos.size > 0:
         ax.scatter(content_ues_pos[:, 0], content_ues_pos[:, 1], c="green", marker=".", alpha=0.6, label="UE (Content Req)")
+
+    if energy_ues_pos.size > 0:
+        ax.scatter(energy_ues_pos[:, 0], energy_ues_pos[:, 1], c="purple", marker=".", alpha=0.6, label="UE (Energy Req)")
 
     # Plot UAV trajectories, comment if not needed
     # cmap = cm["plasma"]

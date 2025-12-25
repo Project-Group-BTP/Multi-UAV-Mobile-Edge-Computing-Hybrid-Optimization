@@ -108,6 +108,10 @@ class UAV:
             ue: UE = self._current_covered_ues[idx]
 
             req_type, _, req_id = ue.current_request
+            if req_type == 2:
+                self._process_energy_request(ue)
+                continue
+
             ue_uav_rate: float = comms.calculate_ue_uav_rate(comms.calculate_channel_gain(ue.pos, self.pos), len(self._current_covered_ues))
 
             best_target_idx, best_target_uav = self._decide_offloading_target(ue.current_request, ue_uav_rate)
@@ -138,7 +142,7 @@ class UAV:
         p_local: float = 1.0 if self.cache[req_id] else 0.0
         ue_uav_upload_latency: float = req_size / ue_uav_rate  # For service
         ue_uav_download_latency: float = file_size / ue_uav_rate  # For content
-        exp_fetch_latency: float = (1 - p_local) * (file_size / self._uav_mbs_rate)  # For both
+        exp_fetch_latency: float = (1.0 - p_local) * (file_size / self._uav_mbs_rate)  # For both
         exp_local_latency: float = exp_fetch_latency + ue_uav_download_latency  # For content
         if req_type == 0:  # Service
             assert self._current_service_request_count > 0
@@ -167,7 +171,7 @@ class UAV:
             uav_uav_rate: float = comms.calculate_uav_uav_rate(comms.calculate_channel_gain(self.pos, neighbor.pos))
             uav_mbs_rate: float = comms.calculate_uav_mbs_rate(comms.calculate_channel_gain(neighbor.pos, config.MBS_POS))
             uav_uav_download_latency: float = file_size / uav_uav_rate
-            exp_neighbor_fetch_latency: float = (1 - belief_prob) * (file_size / uav_mbs_rate)  # For both
+            exp_neighbor_fetch_latency: float = (1.0 - belief_prob) * (file_size / uav_mbs_rate)  # For both
             exp_neighbour_latency: float = exp_neighbor_fetch_latency + uav_uav_download_latency + ue_uav_download_latency  # For content
             if req_type == 0:  # Service
                 # Neighbor Load: They broadcasted 'initial_load'. We add +1 because "If I come, I add to the pile."
@@ -191,6 +195,7 @@ class UAV:
         file_size: int = config.FILE_SIZES[req_id]
 
         ue_uav_upload_latency: float = req_size / ue_uav_rate
+        ue.update_battery(0.0, ue_uav_upload_latency)
         if target_idx == 0:  # Associated UAV
             fetch_latency: float = 0.0
             if not self.cache[req_id]:
@@ -228,6 +233,7 @@ class UAV:
         file_size: int = config.FILE_SIZES[req_id]
 
         ue_uav_download_latency: float = file_size / ue_uav_rate
+        ue.update_battery(0.0, ue_uav_download_latency)
         if target_idx == 0:  # Associated UAV
             fetch_latency: float = 0.0
             if not self.cache[req_id]:
@@ -255,6 +261,13 @@ class UAV:
             ue.latency_current_request = uav_mbs_download_latency + ue_uav_download_latency
             _try_add_file_to_cache(self, req_id)  # Since it was a miss, try to add to associated UAV's cache as well in background
 
+    def _process_energy_request(self, ue: UE) -> None:
+        """Process an emergency energy request from a UE."""
+        channel_gain: float = comms.calculate_channel_gain(self.pos, ue.pos)
+        harv_energy: float = config.WPT_EFFICIENCY * config.WPT_TRANSMIT_POWER * channel_gain * config.TIME_SLOT_DURATION
+        ue.update_battery(harv_energy, 0.0)
+        ue.latency_current_request = 0.0  # No latency deadline for energy requests
+
     def update_ema_and_cache(self) -> None:
         """Update EMA scores and cache reactively."""
         self._ema_scores = config.GDSF_SMOOTHING_FACTOR * self._freq_counts + (1 - config.GDSF_SMOOTHING_FACTOR) * self._ema_scores
@@ -280,3 +293,6 @@ class UAV:
         time_hovering = config.TIME_SLOT_DURATION - time_moving
         fly_energy = config.POWER_MOVE * time_moving + config.POWER_HOVER * time_hovering
         self._energy_current_slot += fly_energy
+        has_energy_request = any(ue.current_request[0] == 2 for ue in self._current_covered_ues)
+        if has_energy_request:
+            self._energy_current_slot += config.WPT_TRANSMIT_POWER * config.TIME_SLOT_DURATION

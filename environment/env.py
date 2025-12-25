@@ -27,7 +27,7 @@ class Env:
         self._time_step = 0
         return self._get_obs()
 
-    def step(self, actions: np.ndarray, visualize: bool = False) -> tuple[list[np.ndarray], list[float], tuple[float, float, float]]:
+    def step(self, actions: np.ndarray) -> tuple[list[np.ndarray], list[float], tuple[float, float, float, float]]:
         """Execute one time step of the simulation."""
         self._time_step += 1
 
@@ -52,16 +52,14 @@ class Env:
 
         # For next time step
         for ue in self._ues:
+            if not ue.assigned:
+                ue.update_battery(0.0, 0.0)
             ue.update_position()
 
         for uav in self._uavs:
             uav.reset_for_next_step()
 
-        if visualize:
-            for uav, action in zip(self._uavs, actions):  # only for visualize script
-                uav.update_position(action)
-        else:
-            self._apply_actions_to_env(actions)
+        self._apply_actions_to_env(actions)
 
         next_obs: list[np.ndarray] = self._get_obs()
         return next_obs, rewards, metrics
@@ -90,14 +88,15 @@ class Env:
                 neighbor_states[i, :] = relative_pos
 
             # Part 3: State of associated UEs
-            ue_states: np.ndarray = np.zeros((config.MAX_ASSOCIATED_UES, 2 + 3))
+            ue_states: np.ndarray = np.zeros((config.MAX_ASSOCIATED_UES, 2 + 3 + 1))
             ues: list[UE] = sorted(uav.current_covered_ues, key=lambda u: float(np.linalg.norm(uav.pos[:2] - u.pos[:2])))[: config.MAX_ASSOCIATED_UES]
             for i, ue in enumerate(ues):
                 delta_pos: np.ndarray = (ue.pos[:2] - uav.pos[:2]) / config.AREA_WIDTH
                 req_type, req_size, req_id = ue.current_request
                 norm_id: float = float(req_id) / float(config.NUM_FILES)
                 norm_size: float = float(req_size) / float(config.MAX_INPUT_SIZE)
-                request_info: np.ndarray = np.array([req_type, norm_size, norm_id], dtype=np.float32)
+                norm_battery: float = ue.battery_level / config.UE_BATTERY_CAPACITY
+                request_info: np.ndarray = np.array([req_type, norm_size, norm_id, norm_battery], dtype=np.float32)
                 ue_states[i, :] = np.concatenate([delta_pos, request_info])
 
             # Part 4: Combine all parts into a single, flat observation vector
@@ -171,7 +170,7 @@ class Env:
             best_uav.current_covered_ues.append(ue)
             ue.assigned = True
 
-    def _get_rewards_and_metrics(self) -> tuple[list[float], tuple[float, float, float]]:
+    def _get_rewards_and_metrics(self) -> tuple[list[float], tuple[float, float, float, float]]:
         """Returns the reward and other metrics."""
         total_latency: float = sum(ue.latency_current_request if ue.assigned else config.NON_SERVED_LATENCY_PENALTY for ue in self._ues)
         total_energy: float = sum(uav.energy for uav in self._uavs)
@@ -179,11 +178,14 @@ class Env:
         jfi: float = 0.0
         if sc_metrics.size > 0 and np.sum(sc_metrics**2) > 0:
             jfi = (np.sum(sc_metrics) ** 2) / (sc_metrics.size * np.sum(sc_metrics**2))
+        offline_count: int = sum(1 for ue in self._ues if ue.battery_level < config.UE_CRITICAL_THRESHOLD)
+        offline_rate: float = offline_count / config.NUM_UES
 
         r_fairness: float = config.ALPHA_3 * np.log(jfi + config.EPSILON)
         r_latency: float = config.ALPHA_1 * np.log(total_latency + config.EPSILON)
         r_energy: float = config.ALPHA_2 * np.log(total_energy + config.EPSILON)
-        reward: float = r_fairness - r_latency - r_energy
+        r_offline: float = config.ALPHA_4 * np.log(1.0 + offline_rate)
+        reward: float = r_fairness - r_latency - r_energy - r_offline
         rewards: list[float] = [reward] * config.NUM_UAVS
         for uav in self._uavs:
             if uav.collision_violation:
@@ -191,4 +193,4 @@ class Env:
             if uav.boundary_violation:
                 rewards[uav.id] -= config.BOUNDARY_PENALTY
         rewards = [r * config.REWARD_SCALING_FACTOR for r in rewards]
-        return rewards, (total_latency, total_energy, jfi)
+        return rewards, (total_latency, total_energy, jfi, offline_rate)
