@@ -38,6 +38,8 @@ class Env:
             uav.process_requests()
 
         for ue in self._ues:
+            if not ue.assigned:
+                ue.update_battery(0.0, 0.0)
             ue.update_service_coverage(self._time_step)
 
         for uav in self._uavs:
@@ -52,8 +54,6 @@ class Env:
 
         # For next time step
         for ue in self._ues:
-            if not ue.assigned:
-                ue.update_battery(0.0, 0.0)
             ue.update_position()
 
         for uav in self._uavs:

@@ -101,6 +101,6 @@ class UE:
     def update_battery(self, harv_energy: float, ue_transmit_time: float) -> None:
         """Updates battery level based on consumption and harvesting."""
         consumed_energy: float = config.UE_STATIC_POWER * config.TIME_SLOT_DURATION
-        consumed_energy += config.TRANSMIT_POWER * ue_transmit_time
+        consumed_energy += config.UE_TRANSMIT_POWER * ue_transmit_time
         self.battery_level = min(config.UE_BATTERY_CAPACITY, self.battery_level - consumed_energy + harv_energy)
         self.battery_level = max(0.0, self.battery_level)

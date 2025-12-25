@@ -16,7 +16,7 @@ def _get_belief_probability(file_id: int, neighbor_id: int) -> float:
     return probability
 
 
-def _get_computing_latency_and_energy(uav: UAV, cpu_cycles: int) -> tuple[float, float]:
+def _get_computing_latency_and_energy(uav: UAV, cpu_cycles: float) -> tuple[float, float]:
     """Calculate computing latency and energy for a UAV processing request."""
     assert uav._current_service_request_count > 0
     computing_capacity_per_request: float = config.UAV_COMPUTING_CAPACITY[uav.id] / uav._current_service_request_count
@@ -132,11 +132,13 @@ class UAV:
             else:
                 self._process_content_request(ue, ue_uav_rate, best_target_idx, best_target_uav)
 
+            assert ue.latency_current_request >= 0.0
+
     def _decide_offloading_target(self, current_req: tuple[int, int, int], ue_uav_rate: float) -> tuple[int, UAV | None]:
         """Returns (target_idx, target_uav_obj); Id: 0 = Local, 1 = Collaborating UAV, 2 = MBS"""
         req_type, req_size, req_id = current_req
         file_size: int = config.FILE_SIZES[req_id]
-        cpu_cycles: int = config.CPU_CYCLES_PER_BYTE[req_id] * req_size if req_type == 0 else -1
+        cpu_cycles: float = float(config.CPU_CYCLES_PER_BYTE[req_id]) * float(req_size) if req_type == 0 else -1.0
 
         # Associated UAV (Local) Expected Latency
         p_local: float = 1.0 if self.cache[req_id] else 0.0
@@ -186,12 +188,13 @@ class UAV:
                 best_target_idx = 1
                 best_target_uav = neighbor
 
+        assert best_exp_latency >= 0.0
         return best_target_idx, best_target_uav
 
     def _process_service_request(self, ue: UE, ue_uav_rate: float, target_idx: int, target_uav: UAV | None) -> None:
         _, req_size, req_id = ue.current_request
         assert req_id < config.NUM_SERVICES
-        cpu_cycles: int = config.CPU_CYCLES_PER_BYTE[req_id] * req_size
+        cpu_cycles: float = float(config.CPU_CYCLES_PER_BYTE[req_id]) * float(req_size)
         file_size: int = config.FILE_SIZES[req_id]
 
         ue_uav_upload_latency: float = req_size / ue_uav_rate
@@ -233,7 +236,7 @@ class UAV:
         file_size: int = config.FILE_SIZES[req_id]
 
         ue_uav_download_latency: float = file_size / ue_uav_rate
-        ue.update_battery(0.0, ue_uav_download_latency)
+        ue.update_battery(0.0, 0.0)
         if target_idx == 0:  # Associated UAV
             fetch_latency: float = 0.0
             if not self.cache[req_id]:
@@ -263,7 +266,7 @@ class UAV:
 
     def _process_energy_request(self, ue: UE) -> None:
         """Process an emergency energy request from a UE."""
-        channel_gain: float = comms.calculate_channel_gain(self.pos, ue.pos)
+        channel_gain: float = comms.calculate_channel_gain(self.pos, ue.pos) * 1e6
         harv_energy: float = config.WPT_EFFICIENCY * config.WPT_TRANSMIT_POWER * channel_gain * config.TIME_SLOT_DURATION
         ue.update_battery(harv_energy, 0.0)
         ue.latency_current_request = 0.0  # No latency deadline for energy requests

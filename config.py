@@ -22,8 +22,8 @@ UE_MAX_WAIT_TIME: int = 10  # in time slots
 # UAV Parameters
 UAV_ALTITUDE: int = 100  # H in meters
 UAV_SPEED: int = 30  # v^UAV in m/s
-UAV_STORAGE_CAPACITY: np.ndarray = np.random.choice(np.arange(5 * 10**6, 20 * 10**6, 10**6), size=NUM_UAVS)  # S_u in bytes
-UAV_COMPUTING_CAPACITY: np.ndarray = np.random.choice(np.arange(5 * 10**9, 20 * 10**9, 10**9), size=NUM_UAVS)  # F_u in cycles/sec
+UAV_STORAGE_CAPACITY: np.ndarray = np.random.choice(np.arange(25 * 10**6, 100 * 10**6, 10**6), size=NUM_UAVS).astype(np.int64)  # S_u in bytes
+UAV_COMPUTING_CAPACITY: np.ndarray = np.random.choice(np.arange(5 * 10**9, 20 * 10**9, 10**9), size=NUM_UAVS).astype(np.int64)  # F_u in cycles/sec
 UAV_SENSING_RANGE: float = 300.0  # R^sense in meters
 UAV_COVERAGE_RADIUS: float = 100.0  # R in meters
 MIN_UAV_SEPARATION: float = 200.0  # d_min in meters
@@ -51,9 +51,9 @@ NUM_SERVICES: int = 50  # S
 NUM_CONTENTS: int = 100  # K
 NUM_FILES: int = NUM_SERVICES + NUM_CONTENTS  # S + K
 CPU_CYCLES_PER_BYTE: np.ndarray = np.random.randint(2000, 4000, size=NUM_SERVICES)  # omega_s_m
-FILE_SIZES: np.ndarray = np.random.randint(10**5, 5 * 10**5, size=NUM_FILES)  # in bytes
-MIN_INPUT_SIZE: int = 1 * 10**5  # in bytes
-MAX_INPUT_SIZE: int = 5 * 10**5  # in bytes
+FILE_SIZES: np.ndarray = np.random.randint(10**6, 5 * 10**6, size=NUM_FILES).astype(np.int64)  # in bytes
+MIN_INPUT_SIZE: int = 1 * 10**6  # in bytes
+MAX_INPUT_SIZE: int = 5 * 10**6  # in bytes
 ZIPF_BETA: float = 0.6  # beta^Zipf
 K_CPU: float = 1e-27  # CPU capacitance coefficient
 
@@ -69,14 +69,15 @@ PROB_GAMMA: float = 0.5  # gamma
 G_CONSTS_PRODUCT: float = 2.2846 * 1.42 * 1e-4  # G_0 * g_0
 TRANSMIT_POWER: float = 0.5  # P^comm in Watts
 AWGN: float = 1e-13  # sigma^2
-BANDWIDTH_INTER: int = 30 * 10**6  # B^inter in Hz
-BANDWIDTH_EDGE: int = 20 * 10**6  # B^edge in Hz
-BANDWIDTH_BACKHAUL: int = 15 * 10**6  # B^backhaul in Hz
+BANDWIDTH_INTER: int = 20 * 10**6  # B^inter in Hz
+BANDWIDTH_EDGE: int = 40 * 10**6  # B^edge in Hz
+BANDWIDTH_BACKHAUL: int = 10 * 10**6  # B^backhaul in Hz
 
 # WPT Parameters
-UE_BATTERY_CAPACITY: float = 50.0  # B_max in Joules
-UE_CRITICAL_THRESHOLD: float = 0.15 * UE_BATTERY_CAPACITY  # B_low in Joules
-WPT_TRANSMIT_POWER: float = 50.0  # P^WPT in Watts
+UE_TRANSMIT_POWER: float = 1  # P^UE in Watts
+UE_BATTERY_CAPACITY: float = 20.0  # B_max in Joules
+UE_CRITICAL_THRESHOLD: float = 0.2 * UE_BATTERY_CAPACITY  # B_low in Joules
+WPT_TRANSMIT_POWER: float = 100.0  # P^WPT in Watts
 WPT_EFFICIENCY: float = 0.5  # eta (energy harvesting efficiency)
 UE_STATIC_POWER: float = 0.01  # Idle power consumption
 
