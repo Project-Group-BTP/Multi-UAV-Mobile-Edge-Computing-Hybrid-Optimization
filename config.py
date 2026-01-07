@@ -74,7 +74,6 @@ BANDWIDTH_EDGE: int = 40 * 10**6  # B^edge in Hz
 BANDWIDTH_BACKHAUL: int = 10 * 10**6  # B^backhaul in Hz
 
 # WPT Parameters
-UE_TRANSMIT_POWER: float = 1  # P^UE in Watts
 UE_BATTERY_CAPACITY: float = 20.0  # B_max in Joules
 UE_CRITICAL_THRESHOLD: float = 0.2 * UE_BATTERY_CAPACITY  # B_low in Joules
 WPT_TRANSMIT_POWER: float = 100.0  # P^WPT in Watts

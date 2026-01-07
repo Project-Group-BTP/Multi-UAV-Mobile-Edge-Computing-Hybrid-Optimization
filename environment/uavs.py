@@ -7,9 +7,7 @@ import numpy as np
 
 def _get_belief_probability(file_id: int, neighbor_id: int) -> float:
     """Returns the estimated probability P_{v,i} that a neighbor has file_i."""
-    rank: int = file_id
-    if file_id >= config.NUM_SERVICES:
-        rank = file_id - config.NUM_SERVICES
+    rank = UE.id_to_rank_map[file_id]
     c_hat_v: float = config.UAV_STORAGE_CAPACITY[neighbor_id] / config.AVG_FILE_SIZE
     exponent: float = config.PROB_GAMMA * (rank - c_hat_v)
     probability: float = 1.0 / (1.0 + np.exp(exponent))
