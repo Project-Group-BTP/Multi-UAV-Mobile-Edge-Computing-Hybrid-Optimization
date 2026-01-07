@@ -14,7 +14,14 @@ import time
 
 def train_on_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: int) -> None:
     start_time: float = time.time()
-    buffer: RolloutBuffer = RolloutBuffer(num_agents=config.NUM_UAVS, obs_dim=config.OBS_DIM_SINGLE, action_dim=config.ACTION_DIM, state_dim=config.STATE_DIM, buffer_size=config.PPO_ROLLOUT_LENGTH, device=model.device)
+    buffer: RolloutBuffer = RolloutBuffer(
+        num_agents=config.NUM_UAVS,
+        obs_dim=config.OBS_DIM_SINGLE,
+        action_dim=config.ACTION_DIM,
+        state_dim=config.STATE_DIM,
+        buffer_size=config.PPO_ROLLOUT_LENGTH,
+        device=model.device,
+    )
     max_time_steps: int = num_episodes * config.STEPS_PER_EPISODE
     num_updates: int = max_time_steps // config.PPO_ROLLOUT_LENGTH
     assert num_updates > 0, "num_updates is 0, please modify settings."
@@ -25,6 +32,7 @@ def train_on_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: in
     print(f"Each update has {config.PPO_ROLLOUT_LENGTH} steps.")
     print(f"Updates for {config.PPO_EPOCHS} epochs with batch size {config.PPO_BATCH_SIZE}.")
     rollout_log: Log = Log()
+    accumulated_losses: dict = {"actor": [], "critic": [], "entropy": []}
 
     for update in range(1, num_updates + 1):
         obs: list[np.ndarray] = env.reset()
@@ -65,14 +73,28 @@ def train_on_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: in
 
         for _ in range(config.PPO_EPOCHS):
             for batch in buffer.get_batches(config.PPO_BATCH_SIZE):
-                model.update(batch)
+                loss_dict = model.update(batch)
+                if loss_dict:
+                    accumulated_losses["actor"].append(loss_dict.get("actor"))
+                    accumulated_losses["critic"].append(loss_dict.get("critic"))
+                    accumulated_losses["entropy"].append(loss_dict.get("entropy"))
 
         buffer.clear()
 
         rollout_log.append(rollout_reward, rollout_latency, rollout_energy, rollout_fairness)
         if update % config.LOG_FREQ == 0:
             elapsed_time: float = time.time() - start_time
-            logger.log_metrics(update, rollout_log, config.LOG_FREQ, elapsed_time, "update")
+            # Prepare averaged losses for logging
+            avg_losses: dict | None = None
+            if accumulated_losses["actor"]:
+                avg_losses = {
+                    "actor": float(np.mean([x for x in accumulated_losses["actor"] if x is not None])),
+                    "critic": float(np.mean([x for x in accumulated_losses["critic"] if x is not None])),
+                    "entropy": float(np.mean([x for x in accumulated_losses["entropy"] if x is not None])),
+                }
+            logger.log_metrics(update, rollout_log, config.LOG_FREQ, elapsed_time, "update", losses=avg_losses)
+            # Reset accumulated losses for next logging interval
+            accumulated_losses = {"actor": [], "critic": [], "entropy": []}
         if update % save_freq == 0 and update < num_episodes:
             save_models(model, update, "update", logger.timestamp)
 
@@ -86,6 +108,7 @@ def train_off_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: i
     if num_episodes < 1000:
         save_freq = 100
     episode_log: Log = Log()
+    accumulated_losses: dict = {"actor": [], "critic": [], "alpha": []}
 
     for episode in range(1, num_episodes + 1):
         obs = env.reset()
@@ -114,7 +137,11 @@ def train_off_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: i
 
             if total_step_count > config.INITIAL_RANDOM_STEPS and step % config.LEARN_FREQ == 0 and len(buffer) > config.REPLAY_BATCH_SIZE:
                 batch = buffer.sample(config.REPLAY_BATCH_SIZE)
-                model.update(batch)
+                loss_dict = model.update(batch)
+                if loss_dict:
+                    accumulated_losses["actor"].append(loss_dict.get("actor"))
+                    accumulated_losses["critic"].append(loss_dict.get("critic"))
+                    accumulated_losses["alpha"].append(loss_dict.get("alpha"))
 
             obs = next_obs
 
@@ -128,7 +155,24 @@ def train_off_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: i
         episode_log.append(episode_reward, episode_latency, episode_energy, episode_fairness)
         if episode % config.LOG_FREQ == 0:
             elapsed_time: float = time.time() - start_time
-            logger.log_metrics(episode, episode_log, config.LOG_FREQ, elapsed_time, "episode")
+            # Prepare averaged losses for logging
+            avg_losses: dict | None = None
+            if accumulated_losses["actor"]:
+                avg_losses = {
+                    "actor": float(np.mean([x for x in accumulated_losses["actor"] if x is not None])),
+                    "critic": float(np.mean([x for x in accumulated_losses["critic"] if x is not None])),
+                    "alpha": float(np.mean([x for x in accumulated_losses["alpha"] if x is not None])),
+                }
+            logger.log_metrics(
+                episode,
+                episode_log,
+                config.LOG_FREQ,
+                elapsed_time,
+                "episode",
+                losses=avg_losses,
+            )
+            # Reset accumulated losses for next logging interval
+            accumulated_losses = {"actor": [], "critic": [], "alpha": []}
         if episode % save_freq == 0 and episode < num_episodes:
             save_models(model, episode, "episode", logger.timestamp, total_steps=total_step_count)
 
@@ -168,4 +212,4 @@ def train_random(env: Env, model: MARLModel, logger: Logger, num_episodes: int) 
         episode_log.append(episode_reward, episode_latency, episode_energy, episode_fairness)
         if episode % config.LOG_FREQ == 0:
             elapsed_time: float = time.time() - start_time
-            logger.log_metrics(episode, episode_log, config.LOG_FREQ, elapsed_time, "episode")
+            logger.log_metrics(episode, episode_log, config.LOG_FREQ, elapsed_time, "episode", losses=None)

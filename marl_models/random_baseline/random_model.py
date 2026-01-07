@@ -9,8 +9,9 @@ class RandomModel(MARLModel):
     def select_actions(self, observations: list[np.ndarray], exploration: bool = True) -> np.ndarray:
         return np.random.uniform(-1.0, 1.0, (self.num_agents, self.action_dim))
 
-    def update(self, batch: ExperienceBatch) -> None:
-        pass
+    def update(self, batch: ExperienceBatch) -> dict:
+        """Random baseline does not learn, return empty losses dict."""
+        return {}
 
     def reset(self) -> None:
         pass
