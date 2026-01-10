@@ -1,5 +1,6 @@
 from marl_models.base_model import MARLModel
 from marl_models.maddpg.maddpg import MADDPG
+from marl_models.attention_maddpg.attention_maddpg import AttentionMADDPG
 from marl_models.matd3.matd3 import MATD3
 from marl_models.mappo.mappo import MAPPO
 from marl_models.masac.masac import MASAC
@@ -26,6 +27,8 @@ def get_model(model_name: str) -> MARLModel:
     device = get_device()
     if model_name == "maddpg":
         return MADDPG(model_name=model_name, num_agents=config.NUM_UAVS, obs_dim=config.OBS_DIM_SINGLE, action_dim=config.ACTION_DIM, device=device)
+    elif model_name == "attention_maddpg":
+        return AttentionMADDPG(model_name=model_name, num_agents=config.NUM_UAVS, obs_dim=config.OBS_DIM_SINGLE, action_dim=config.ACTION_DIM, device=device)
     elif model_name == "matd3":
         return MATD3(model_name=model_name, num_agents=config.NUM_UAVS, obs_dim=config.OBS_DIM_SINGLE, action_dim=config.ACTION_DIM, device=device)
     elif model_name == "mappo":
@@ -35,7 +38,7 @@ def get_model(model_name: str) -> MARLModel:
     elif model_name == "random":
         return RandomModel(model_name=model_name, num_agents=config.NUM_UAVS, obs_dim=config.OBS_DIM_SINGLE, action_dim=config.ACTION_DIM, device=device)
     else:
-        raise ValueError(f"Unknown model type: {model_name}. Supported types: maddpg, matd3, mappo, masac, random")
+        raise ValueError(f"Unknown model type: {model_name}. Supported types: maddpg, attention_maddpg, matd3, mappo, masac, random")
 
 
 def save_models(model: MARLModel, progress_step: int, name: str, timestamp: str, final: bool = False, total_steps: int = 0):

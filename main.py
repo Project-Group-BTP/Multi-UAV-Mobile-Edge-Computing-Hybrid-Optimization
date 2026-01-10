@@ -41,7 +41,7 @@ def start_training(args: argparse.Namespace):
         print(f"📥 Models loaded successfully from {args.resume_path}")
         print(f"📂 Resumed training from: {args.resume_path}\n")
 
-    if model_name in ["maddpg", "matd3", "masac"]:
+    if model_name in ["maddpg", "attention_maddpg", "matd3", "masac"]:
         train_off_policy(env, model, logger, args.num_episodes, total_step_count)
     elif model_name == "mappo":
         train_on_policy(env, model, logger, args.num_episodes)

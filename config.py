@@ -1,7 +1,7 @@
 import numpy as np
 
 # Training Parameters
-MODEL: str = "maddpg"  # options: 'maddpg', 'matd3', 'mappo', 'masac', 'random'
+MODEL: str = "maddpg"  # options: 'maddpg', 'attention_maddpg', 'matd3', 'mappo', 'masac', 'random'
 SEED: int = 1234  # random seed for reproducibility
 STEPS_PER_EPISODE: int = 1000  # total T
 LOG_FREQ: int = 10  # episodes

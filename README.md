@@ -11,6 +11,7 @@ Currently included MARL models:
 - MATD3 (Multi-Agent Twin Delayed Deep Deterministic Policy Gradient)
 - MAPPO (Multi-Agent Proximal Policy Optimization)
 - MASAC (Multi-Agent Soft Actor-Critic)
+- Attention based version of MADDPG
 - Random baseline
 
 ![System Model](docs/system_model.jpg)
@@ -31,6 +32,9 @@ Directory Structure:
 │   ├── maddpg
 │   │   ├── agents.py
 │   │   └── maddpg.py
+│   ├── attention_maddpg
+│   │   ├── agents.py
+│   │   └── attention_maddpg.py
 │   ├── matd3
 │   │   ├── agents.py
 │   │   └── matd3.py
