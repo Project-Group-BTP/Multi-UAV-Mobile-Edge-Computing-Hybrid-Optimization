@@ -6,6 +6,7 @@ import torch
 import json
 from datetime import datetime
 import warnings
+import optuna.visualization as vis
 
 import config
 from environment.env import Env
@@ -80,9 +81,9 @@ def run_tuning(args):
     # Use MedianPruner for Early Stopping
     # It stops a trial if its intermediate result is worse than the median of previous trials
     pruner = optuna.pruners.MedianPruner(
-        n_startup_trials=5,  # Don't prune the first 5 trials
-        n_warmup_steps=20,  # Don't prune the first 20 episodes/updates of any trial
-        interval_steps=1,  # Check for pruning every step
+        n_startup_trials=5,  # Don't prune the first 5 trials (let them complete)
+        n_warmup_steps=10,  # Don't prune early steps of any trial
+        interval_steps=1,  # Check for pruning at every report
     )
 
     study = optuna.create_study(
@@ -96,16 +97,58 @@ def run_tuning(args):
 
     print("\n🏆 Tuning Completed!")
     print(f"Best Trial Score: {study.best_value}")
+    print(f"Best Trial Number: {study.best_trial.number}")
     print("Best Parameters:")
     print(json.dumps(study.best_params, indent=4))
 
-    # Save best params
+    # Save best params and study summary
     save_path = f"tuning_logs/{config.MODEL}/stage_{args.stage}.json"
     if not os.path.exists(os.path.dirname(save_path)):
         os.makedirs(os.path.dirname(save_path))
+    
+    results = {
+        "best_params": study.best_params,
+        "best_value": study.best_value,
+        "best_trial": study.best_trial.number,
+        "n_trials": len(study.trials),
+        "n_pruned": len([t for t in study.trials if t.state == optuna.trial.TrialState.PRUNED]),
+    }
+    
     with open(save_path, "w") as f:
-        json.dump(study.best_params, f, indent=4)
+        json.dump(results, f, indent=4)
     print(f"💾 Saved best parameters to {save_path}")
+    
+    # Generate plots
+    try:
+        plot_tuning_results(study, config.MODEL, args.stage)
+    except Exception as e:
+        print(f"⚠️ Could not generate plots: {e}")
+
+
+def plot_tuning_results(study: optuna.Study, model_name: str, stage: int) -> None:
+    """Generates and saves tuning result plots."""
+
+    plot_dir = f"tuning_logs/{model_name}/plots_stage_{stage}"
+    if not os.path.exists(plot_dir):
+        os.makedirs(plot_dir)
+
+    # Parameter Importance
+    fig = vis.plot_param_importances(study)
+    fig.write_image(f"{plot_dir}/param_importance.png")
+
+    # Optimization History
+    fig = vis.plot_optimization_history(study)
+    fig.write_image(f"{plot_dir}/optimization_history.png")
+
+    # Slice Plot - Shows individual parameter effects
+    fig = vis.plot_slice(study)
+    fig.write_image(f"{plot_dir}/slice_plot.png")
+
+    # Intermediate Values - Shows learning curves across trials
+    fig = vis.plot_intermediate_values(study)
+    fig.write_image(f"{plot_dir}/intermediate_values.png")
+
+    print(f"📊 Saved tuning plots to {plot_dir}")
 
 
 if __name__ == "__main__":
