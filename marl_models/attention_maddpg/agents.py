@@ -13,8 +13,11 @@ def layer_init(layer: nn.Linear, std: float = np.sqrt(2), bias_const: float = 0.
 
 
 class CrossAttentionExtractor(nn.Module):
-    def __init__(self, self_dim: int, target_dim: int, hidden_dim: int = 64):
+    def __init__(self, self_dim: int, target_dim: int, hidden_dim: int = 64, num_heads: int = 4) -> None:
         super(CrossAttentionExtractor, self).__init__()
+        self.num_heads: int = num_heads
+        self.head_dim: int = hidden_dim // num_heads
+        assert hidden_dim % num_heads == 0, "hidden_dim must be divisible by num_heads"
         # Query comes from "Self" (UAV)
         self.query_layer: nn.Linear = layer_init(nn.Linear(self_dim, hidden_dim))
 
@@ -22,22 +25,29 @@ class CrossAttentionExtractor(nn.Module):
         self.key_layer: nn.Linear = layer_init(nn.Linear(target_dim, hidden_dim))
         self.value_layer: nn.Linear = layer_init(nn.Linear(target_dim, hidden_dim))
         self.scale: float = hidden_dim ** (-0.5)
+        self.out_proj: nn.Linear = layer_init(nn.Linear(hidden_dim, hidden_dim))
 
     def forward(self, self_embedding: torch.Tensor, target_embeddings: torch.Tensor, mask: torch.Tensor | None = None):
         # self_embedding: (batch, self_dim)
         # target_embeddings: (batch, max_targets, target_dim)
-        # mask: (batch, max_targets) -> 1 if real, 0 if padding
-        Q: torch.Tensor = self.query_layer(self_embedding).unsqueeze(1)  # (batch, 1, hidden)
-        K: torch.Tensor = self.key_layer(target_embeddings)  # (batch, max_targets, hidden)
-        V: torch.Tensor = self.value_layer(target_embeddings)  # (batch, max_targets, hidden)
+        batch_size: int = self_embedding.shape[0]
 
+        # 1. Linear Projections & Split Heads
+        # Q: (batch, 1, hidden) -> (batch, 1, num_heads, head_dim) -> (batch, num_heads, 1, head_dim)
+        Q: torch.Tensor = self.query_layer(self_embedding).unsqueeze(1).view(batch_size, 1, self.num_heads, self.head_dim).transpose(1, 2)
+
+        # K, V: (batch, num_targets, hidden) -> (batch, num_targets, num_heads, head_dim) -> (batch, num_heads, num_targets, head_dim)
+        K: torch.Tensor = self.key_layer(target_embeddings).view(batch_size, -1, self.num_heads, self.head_dim).transpose(1, 2)
+        V: torch.Tensor = self.value_layer(target_embeddings).view(batch_size, -1, self.num_heads, self.head_dim).transpose(1, 2)
         # Attention Scores
         # (batch, 1, hidden) @ (batch, hidden, max_targets) -> (batch, 1, max_targets)
         scores: torch.Tensor = torch.matmul(Q, K.transpose(-2, -1)) * self.scale
 
         if mask is not None:
             # Mask padding positions (set score to -infinity so Softmax becomes 0)
-            scores: torch.Tensor = scores.masked_fill(mask.unsqueeze(1) == 0, float("-inf"))
+            # Mask: (batch, targets) -> (batch, 1, 1, targets)
+            mask_expanded: torch.Tensor = mask.unsqueeze(1).unsqueeze(1)
+            scores = scores.masked_fill(mask_expanded == 0, float("-inf"))
 
         attn_weights: torch.Tensor = F.softmax(scores, dim=-1)
 
@@ -46,7 +56,13 @@ class CrossAttentionExtractor(nn.Module):
 
         # Weighted Sum
         context: torch.Tensor = torch.matmul(attn_weights, V)  # (batch, 1, hidden)
-        return context.squeeze(1)
+
+        # (batch, heads, 1, head_dim) -> (batch, 1, heads, head_dim) -> (batch, 1, hidden)
+        context = context.transpose(1, 2).reshape(batch_size, 1, -1)
+
+        # 4. Final Projection
+        output = self.out_proj(context)
+        return output.squeeze(1)
 
 
 class ActorNetwork(nn.Module):

@@ -175,7 +175,7 @@ class MASAC(MARLModel):
             agent_path: str = os.path.join(directory, f"agent_{i}.pth")
             if not os.path.exists(agent_path):
                 raise FileNotFoundError(f"❌ Model file not found: {agent_path}")
-            checkpoint = torch.load(agent_path, map_location=self.device)
+            checkpoint = torch.load(agent_path, map_location=self.device, weights_only=True)
             self.actors[i].load_state_dict(checkpoint["actor"])
             self.critics_1[i].load_state_dict(checkpoint["critic_1"])
             self.critics_2[i].load_state_dict(checkpoint["critic_2"])

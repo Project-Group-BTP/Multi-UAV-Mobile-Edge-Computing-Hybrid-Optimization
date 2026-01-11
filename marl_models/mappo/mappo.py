@@ -114,7 +114,7 @@ class MAPPO(MARLModel):
         path: str = os.path.join(directory, "mappo.pth")
         if not os.path.exists(path):
             raise FileNotFoundError(f"❌ Model file not found: {path}")
-        checkpoint: dict = torch.load(path, map_location=self.device)
+        checkpoint: dict = torch.load(path, map_location=self.device, weights_only=True)
         self.actors.load_state_dict(checkpoint["actor"])
         self.critics.load_state_dict(checkpoint["critic"])
         self.actor_optimizer.load_state_dict(checkpoint["actor_optimizer"])
