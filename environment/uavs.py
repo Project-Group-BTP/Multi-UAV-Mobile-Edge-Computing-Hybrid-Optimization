@@ -172,17 +172,17 @@ class UAV:
             uav_mbs_rate: float = comms.calculate_uav_mbs_rate(comms.calculate_channel_gain(neighbor.pos, config.MBS_POS))
             uav_uav_download_latency: float = file_size / uav_uav_rate
             exp_neighbor_fetch_latency: float = (1.0 - belief_prob) * (file_size / uav_mbs_rate)  # For both
-            exp_neighbour_latency: float = exp_neighbor_fetch_latency + uav_uav_download_latency + ue_uav_download_latency  # For content
+            exp_neighbor_latency: float = exp_neighbor_fetch_latency + uav_uav_download_latency + ue_uav_download_latency  # For content
             if req_type == 0:  # Service
                 # Neighbor Load: They broadcasted 'initial_load'. We add +1 because "If I come, I add to the pile."
                 neigh_load: int = neighbor._current_service_request_count + 1
                 assert neigh_load > 0
                 est_comp_latency: float = cpu_cycles / (config.UAV_COMPUTING_CAPACITY[neighbor.id] / neigh_load)
                 uav_uav_upload_latency: float = req_size / uav_uav_rate
-                exp_neighbour_latency = ue_uav_upload_latency + uav_uav_upload_latency + exp_neighbor_fetch_latency + est_comp_latency  # Overwrite for service
+                exp_neighbor_latency = ue_uav_upload_latency + uav_uav_upload_latency + exp_neighbor_fetch_latency + est_comp_latency  # Overwrite for service
 
-            if exp_neighbour_latency < best_exp_latency:
-                best_exp_latency = exp_neighbour_latency
+            if exp_neighbor_latency < best_exp_latency:
+                best_exp_latency = exp_neighbor_latency
                 best_target_idx = 1
                 best_target_uav = neighbor
 

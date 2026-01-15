@@ -81,14 +81,14 @@ class Env:
             own_state: np.ndarray = np.concatenate([own_pos, own_cache])
 
             # Part 2: Neighbor positions
-            neighbor_states: np.ndarray = np.zeros((config.MAX_UAV_NEIGHBORS, 2))
+            neighbor_states: np.ndarray = np.zeros((config.MAX_UAV_NEIGHBORS, config.NEIGHBOR_OBS_DIM))
             neighbors: list[UAV] = sorted(uav.neighbors, key=lambda n: float(np.linalg.norm(uav.pos - n.pos)))[: config.MAX_UAV_NEIGHBORS]
             for i, neighbor in enumerate(neighbors):
                 relative_pos: np.ndarray = (neighbor.pos[:2] - uav.pos[:2]) / config.UAV_SENSING_RANGE
                 neighbor_states[i, :] = relative_pos
 
             # Part 3: State of associated UEs
-            ue_states: np.ndarray = np.zeros((config.MAX_ASSOCIATED_UES, 2 + 3 + 1))
+            ue_states: np.ndarray = np.zeros((config.MAX_ASSOCIATED_UES, config.UE_OBS_DIM))
             ues: list[UE] = sorted(uav.current_covered_ues, key=lambda u: float(np.linalg.norm(uav.pos[:2] - u.pos[:2])))[: config.MAX_ASSOCIATED_UES]
             for i, ue in enumerate(ues):
                 delta_pos: np.ndarray = (ue.pos[:2] - uav.pos[:2]) / config.AREA_WIDTH

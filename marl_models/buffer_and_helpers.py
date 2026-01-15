@@ -1,6 +1,7 @@
 from marl_models.base_model import OffPolicyExperienceBatch
 import config
 import torch
+import torch.nn as nn
 import numpy as np
 from collections import deque
 from collections.abc import Generator
@@ -135,3 +136,11 @@ class GaussianNoise:
 
     def reset(self) -> None:
         self.scale = config.INITIAL_NOISE_SCALE
+
+
+def layer_init(layer: nn.Linear, std: float = np.sqrt(2), bias_const: float = 0.0) -> nn.Linear:
+    """Added orthogonal initialization for better training stability"""
+    nn.init.orthogonal_(layer.weight, std)
+    if layer.bias is not None:
+        nn.init.constant_(layer.bias, bias_const)
+    return layer

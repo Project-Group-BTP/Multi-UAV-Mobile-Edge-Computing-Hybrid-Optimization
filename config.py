@@ -1,7 +1,7 @@
 import numpy as np
 
 # Training Parameters
-MODEL: str = "maddpg"  # options: 'maddpg', 'attention_maddpg', 'matd3', 'mappo', 'masac', 'random'
+MODEL: str = "maddpg"  # options: 'maddpg', 'matd3', 'mappo', 'masac', 'attention_<model>', 'random'
 SEED: int = 1234  # random seed for reproducibility
 STEPS_PER_EPISODE: int = 1000  # total T
 LOG_FREQ: int = 10  # episodes
@@ -38,7 +38,7 @@ COLLISION_PENALTY: float = 100.0  # penalty per collision
 BOUNDARY_PENALTY: float = 100.0  # penalty for going out of bounds
 NON_SERVED_LATENCY_PENALTY: float = 20.0  # penalty in latency for non-served requests
 # IMPORTANT : Reconfigurable, should try for various values including : NUM_UAVS - 1 and NUM_UES
-MAX_UAV_NEIGHBORS: int = min(5, NUM_UAVS - 1)
+MAX_UAV_NEIGHBORS: int = NUM_UAVS - 1
 MAX_ASSOCIATED_UES: int = min(30, NUM_UES // NUM_UAVS + 10)
 assert MAX_UAV_NEIGHBORS >= 1 and MAX_UAV_NEIGHBORS <= NUM_UAVS - 1
 assert MAX_ASSOCIATED_UES >= 1 and MAX_ASSOCIATED_UES <= NUM_UES
@@ -88,8 +88,10 @@ ALPHA_3 = 4.0  # weightage for fairness
 ALPHA_4 = 4.0  # weightage for offline rate
 REWARD_SCALING_FACTOR: float = 0.01  # scaling factor for rewards
 
-OBS_DIM_SINGLE: int = 2 + NUM_FILES + (MAX_UAV_NEIGHBORS * 2) + (MAX_ASSOCIATED_UES * (2 + 3 + 1))
-# own state: pos (2) + cache (NUM_FILES) + Neighbors: pos (2) + UEs: pos (2) + request_tuple (3) + battery level (1)
+SELF_OBS_DIM: int = 2 + NUM_FILES  # pos (2) + cache (NUM_FILES)
+UE_OBS_DIM: int = 2 + 3 + 1  # pos (2) + request_tuple (3) + battery level (1)
+NEIGHBOR_OBS_DIM: int = 2  # pos (2)
+OBS_DIM_SINGLE: int = SELF_OBS_DIM + (MAX_UAV_NEIGHBORS * NEIGHBOR_OBS_DIM) + (MAX_ASSOCIATED_UES * UE_OBS_DIM)
 
 ACTION_DIM: int = 2  # angle, distance from [-1, 1]
 STATE_DIM: int = NUM_UAVS * OBS_DIM_SINGLE
@@ -130,3 +132,7 @@ PPO_ENTROPY_COEF: float = 0.01  # coefficient for the entropy bonus to encourage
 
 # MASAC Specific Hyperparameters
 ALPHA_LR: float = 3e-4  # learning rate for the entropy temperature alpha
+
+# Attention Hyperparameters
+ATTN_HIDDEN_DIM: int = 64  # Embedding size for internal attention representations
+ATTN_NUM_HEADS: int = 4  # Number of attention heads
