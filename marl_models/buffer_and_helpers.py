@@ -115,7 +115,7 @@ class RolloutBuffer:
         self.step = 0
 
 
-def soft_update(target_net: torch.nn.Module, source_net: torch.nn.Module, tau: float):
+def soft_update(target_net: nn.Module, source_net: nn.Module, tau: float):
     """Performs a soft update of the target network's parameters."""
     with torch.no_grad():
         for target_param, param in zip(target_net.parameters(), source_net.parameters()):

@@ -108,7 +108,7 @@ EPSILON: float = 1e-9  # small value to prevent division by zero
 
 # Off-policy algorithm hyperparameters
 REPLAY_BUFFER_SIZE: int = 10**6  # B
-REPLAY_BATCH_SIZE: int = 64  # minibatch size
+REPLAY_BATCH_SIZE: int = 256  # minibatch size
 INITIAL_RANDOM_STEPS: int = 5000  # steps of random actions for exploration
 LEARN_FREQ: int = 5  # steps to learn after
 
@@ -126,7 +126,7 @@ NOISE_CLIP: float = 0.5  # range to clip target policy smoothing noise
 PPO_ROLLOUT_LENGTH: int = 2048  # number of steps to collect per rollout before updating
 PPO_GAE_LAMBDA: float = 0.95  # lambda parameter for GAE
 PPO_EPOCHS: int = 10  # number of epochs to run on the collected rollout data
-PPO_BATCH_SIZE: int = 64  # size of mini-batches to use during the update step
+PPO_BATCH_SIZE: int = 512  # size of mini-batches to use during the update step
 PPO_CLIP_EPS: float = 0.2  # clipping parameter (epsilon) for the PPO surrogate objective
 PPO_ENTROPY_COEF: float = 0.01  # coefficient for the entropy bonus to encourage exploration
 

@@ -93,10 +93,11 @@ class Env:
             for i, ue in enumerate(ues):
                 delta_pos: np.ndarray = (ue.pos[:2] - uav.pos[:2]) / config.AREA_WIDTH
                 req_type, req_size, req_id = ue.current_request
+                norm_type: float = float(req_type) / 2.0  # assuming 3 types: 0,1,2
                 norm_id: float = float(req_id) / float(config.NUM_FILES)
                 norm_size: float = float(req_size) / float(config.MAX_INPUT_SIZE)
                 norm_battery: float = ue.battery_level / config.UE_BATTERY_CAPACITY
-                request_info: np.ndarray = np.array([req_type, norm_size, norm_id, norm_battery], dtype=np.float32)
+                request_info: np.ndarray = np.array([norm_type, norm_size, norm_id, norm_battery], dtype=np.float32)
                 ue_states[i, :] = np.concatenate([delta_pos, request_info])
 
             # Part 4: Combine all parts into a single, flat observation vector
