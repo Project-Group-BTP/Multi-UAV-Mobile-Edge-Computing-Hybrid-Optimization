@@ -8,26 +8,19 @@ from torch.distributions import Normal
 
 
 class MAPPO(MARLModel):
-    def __init__(self, model_name: str, num_agents: int, obs_dim: int, action_dim: int, state_dim: int, device: str) -> None:
+    def __init__(self, model_name: str, num_agents: int, obs_dim: int, action_dim: int, device: str) -> None:
         super().__init__(model_name, num_agents, obs_dim, action_dim, device)
-        self.state_dim: int = state_dim
-
-        # Create networks
-        self.actors: ActorNetwork = ActorNetwork(obs_dim, action_dim).to(device)
-        self.critics: CriticNetwork = CriticNetwork(state_dim).to(device)
-
-        # Create optimizers
-        self.actor_optimizer: torch.optim.Adam = torch.optim.Adam(self.actors.parameters(), lr=config.ACTOR_LR)
-        self.critic_optimizer: torch.optim.Adam = torch.optim.Adam(self.critics.parameters(), lr=config.CRITIC_LR)
+        self.state_dim: int = obs_dim * num_agents
+        self.actor: ActorNetwork = ActorNetwork(obs_dim, action_dim).to(device)
+        self.critic: CriticNetwork = CriticNetwork(self.state_dim).to(device)
+        self.actor_optimizer: torch.optim.Adam = torch.optim.Adam(self.actor.parameters(), lr=config.ACTOR_LR)
+        self.critic_optimizer: torch.optim.Adam = torch.optim.Adam(self.critic.parameters(), lr=config.CRITIC_LR)
 
     def select_actions(self, observations: list[np.ndarray], exploration: bool) -> np.ndarray:
         obs_tensor: torch.Tensor = torch.as_tensor(np.array(observations), dtype=torch.float32, device=self.device)
         with torch.no_grad():
-            dist: Normal = self.actors(obs_tensor)
-            if exploration:
-                actions: torch.Tensor = dist.sample()  # Stochastic actions for exploration
-            else:
-                actions = dist.mean  # Deterministic actions for evaluation
+            dist: Normal = self.actor(obs_tensor)
+            actions: torch.Tensor = dist.sample() if exploration else dist.mean
 
         # Clip actions to be within the valid range [-1, 1]
         return np.clip(actions.cpu().numpy(), -1.0, 1.0)
@@ -37,14 +30,14 @@ class MAPPO(MARLModel):
         state_tensor: torch.Tensor = torch.as_tensor(state, dtype=torch.float32, device=self.device)
 
         with torch.no_grad():
-            dist: Normal = self.actors(obs_tensor)
+            dist: Normal = self.actor(obs_tensor)
             actions: torch.Tensor = dist.sample()
 
             # Get the log probability of the sampled actions
             log_probs: torch.Tensor = dist.log_prob(actions).sum(dim=-1)
 
             # Get the value of the current state from the critic network
-            values: torch.Tensor = self.critics(state_tensor).squeeze(-1)
+            values: torch.Tensor = self.critic(state_tensor).squeeze(-1)
 
         clipped_actions: np.ndarray = np.clip(actions.cpu().numpy(), -1.0, 1.0)
         return clipped_actions, log_probs.cpu().numpy(), values.cpu().numpy()
@@ -63,7 +56,7 @@ class MAPPO(MARLModel):
         advantages_batch = (advantages_batch - advantages_batch.mean()) / (advantages_batch.std() + 1e-8)
 
         # Critic Loss
-        values: torch.Tensor = self.critics(states_batch).squeeze(-1)
+        values: torch.Tensor = self.critic(states_batch).squeeze(-1)
         # Value clipping
         values_clipped: torch.Tensor = old_values_batch + torch.clamp(values - old_values_batch, -config.PPO_CLIP_EPS, config.PPO_CLIP_EPS)
         vf_loss1: torch.Tensor = (values - returns_batch).pow(2)
@@ -71,7 +64,7 @@ class MAPPO(MARLModel):
         critic_loss: torch.Tensor = 0.5 * torch.max(vf_loss1, vf_loss2).mean()
 
         # Actor Loss
-        dist: Normal = self.actors(obs_batch)
+        dist: Normal = self.actor(obs_batch)
         new_log_probs: torch.Tensor = dist.log_prob(actions_batch).sum(dim=-1)
         ratio: torch.Tensor = torch.exp(new_log_probs - old_log_probs_batch)
 
@@ -87,13 +80,13 @@ class MAPPO(MARLModel):
         # Update Actor
         self.actor_optimizer.zero_grad()
         actor_loss.backward()
-        torch.nn.utils.clip_grad_norm_(self.actors.parameters(), config.MAX_GRAD_NORM)
+        torch.nn.utils.clip_grad_norm_(self.actor.parameters(), config.MAX_GRAD_NORM)
         self.actor_optimizer.step()
 
         # Update Critic
         self.critic_optimizer.zero_grad()
         critic_loss.backward()
-        torch.nn.utils.clip_grad_norm_(self.critics.parameters(), config.MAX_GRAD_NORM)
+        torch.nn.utils.clip_grad_norm_(self.critic.parameters(), config.MAX_GRAD_NORM)
         self.critic_optimizer.step()
 
     def reset(self) -> None:
@@ -102,8 +95,8 @@ class MAPPO(MARLModel):
     def save(self, directory: str) -> None:
         torch.save(
             {
-                "actor": self.actors.state_dict(),
-                "critic": self.critics.state_dict(),
+                "actor": self.actor.state_dict(),
+                "critic": self.critic.state_dict(),
                 "actor_optimizer": self.actor_optimizer.state_dict(),
                 "critic_optimizer": self.critic_optimizer.state_dict(),
             },
@@ -115,7 +108,7 @@ class MAPPO(MARLModel):
         if not os.path.exists(path):
             raise FileNotFoundError(f"❌ Model file not found: {path}")
         checkpoint: dict = torch.load(path, map_location=self.device, weights_only=True)
-        self.actors.load_state_dict(checkpoint["actor"])
-        self.critics.load_state_dict(checkpoint["critic"])
+        self.actor.load_state_dict(checkpoint["actor"])
+        self.critic.load_state_dict(checkpoint["critic"])
         self.actor_optimizer.load_state_dict(checkpoint["actor_optimizer"])
         self.critic_optimizer.load_state_dict(checkpoint["critic_optimizer"])

@@ -5,8 +5,7 @@ from marl_models.mappo.mappo import MAPPO
 from marl_models.masac.masac import MASAC
 from marl_models.attention_maddpg.attention_maddpg import AttentionMADDPG
 from marl_models.attention_matd3.attention_matd3 import AttentionMATD3
-
-# from marl_models.attention_mappo.attention_mappo import AttentionMAPPO
+from marl_models.attention_mappo.attention_mappo import AttentionMAPPO
 from marl_models.attention_masac.attention_masac import AttentionMASAC
 from marl_models.random_baseline.random_model import RandomModel
 import config
@@ -34,15 +33,15 @@ def get_model(model_name: str) -> MARLModel:
     elif model_name == "matd3":
         return MATD3(model_name=model_name, num_agents=config.NUM_UAVS, obs_dim=config.OBS_DIM_SINGLE, action_dim=config.ACTION_DIM, device=device)
     elif model_name == "mappo":
-        return MAPPO(model_name=model_name, num_agents=config.NUM_UAVS, obs_dim=config.OBS_DIM_SINGLE, action_dim=config.ACTION_DIM, state_dim=config.STATE_DIM, device=device)
+        return MAPPO(model_name=model_name, num_agents=config.NUM_UAVS, obs_dim=config.OBS_DIM_SINGLE, action_dim=config.ACTION_DIM, device=device)
     elif model_name == "masac":
         return MASAC(model_name=model_name, num_agents=config.NUM_UAVS, obs_dim=config.OBS_DIM_SINGLE, action_dim=config.ACTION_DIM, device=device)
     elif model_name == "attention_maddpg":
         return AttentionMADDPG(model_name=model_name, num_agents=config.NUM_UAVS, obs_dim=config.OBS_DIM_SINGLE, action_dim=config.ACTION_DIM, device=device)
     elif model_name == "attention_matd3":
         return AttentionMATD3(model_name=model_name, num_agents=config.NUM_UAVS, obs_dim=config.OBS_DIM_SINGLE, action_dim=config.ACTION_DIM, device=device)
-    # elif model_name == "attention_mappo":
-    # return AttentionMAPPO(model_name=model_name, num_agents=config.NUM_UAVS, obs_dim=config.OBS_DIM_SINGLE, action_dim=config.ACTION_DIM, state_dim=config.STATE_DIM, device=device)
+    elif model_name == "attention_mappo":
+        return AttentionMAPPO(model_name=model_name, num_agents=config.NUM_UAVS, obs_dim=config.OBS_DIM_SINGLE, action_dim=config.ACTION_DIM, device=device)
     elif model_name == "attention_masac":
         return AttentionMASAC(model_name=model_name, num_agents=config.NUM_UAVS, obs_dim=config.OBS_DIM_SINGLE, action_dim=config.ACTION_DIM, device=device)
     elif model_name == "random":

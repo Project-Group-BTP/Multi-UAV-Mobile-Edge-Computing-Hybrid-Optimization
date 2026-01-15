@@ -92,9 +92,7 @@ SELF_OBS_DIM: int = 2 + NUM_FILES  # pos (2) + cache (NUM_FILES)
 UE_OBS_DIM: int = 2 + 3 + 1  # pos (2) + request_tuple (3) + battery level (1)
 NEIGHBOR_OBS_DIM: int = 2  # pos (2)
 OBS_DIM_SINGLE: int = SELF_OBS_DIM + (MAX_UAV_NEIGHBORS * NEIGHBOR_OBS_DIM) + (MAX_ASSOCIATED_UES * UE_OBS_DIM)
-
 ACTION_DIM: int = 2  # angle, distance from [-1, 1]
-STATE_DIM: int = NUM_UAVS * OBS_DIM_SINGLE
 MLP_HIDDEN_DIM: int = 256
 
 ACTOR_LR: float = 3e-4
@@ -123,7 +121,7 @@ TARGET_POLICY_NOISE: float = 0.2  # standard deviation of target policy smoothin
 NOISE_CLIP: float = 0.5  # range to clip target policy smoothing noise
 
 # MAPPO Specific Hyperparameters
-PPO_ROLLOUT_LENGTH: int = 2048  # number of steps to collect per rollout before updating
+PPO_ROLLOUT_LENGTH: int = STEPS_PER_EPISODE  # number of steps to collect per rollout before updating
 PPO_GAE_LAMBDA: float = 0.95  # lambda parameter for GAE
 PPO_EPOCHS: int = 10  # number of epochs to run on the collected rollout data
 PPO_BATCH_SIZE: int = 512  # size of mini-batches to use during the update step
