@@ -150,37 +150,42 @@ class AttentionCriticBase(nn.Module):
 
         self.fusion_dim: int = self.hidden_dim * 2
 
-    def get_eval_embedding(self, obs_tensor: torch.Tensor, action_tensor: torch.Tensor | None, agent_index: int) -> torch.Tensor:
-        """
-        Calculates the embedding for agent i by attending to all other agents.
-        Args:
-            obs_tensor: (Batch, Num_Agents, Obs_Dim)
-            action_tensor: (Batch, Num_Agents, Action_Dim) OR None (for MAPPO)
-            agent_index: The index of the agent we are critiquing
-        """
-        num_agents: int = obs_tensor.shape[1]
+    def get_all_embeddings(self, inputs: torch.Tensor) -> torch.Tensor:
+        return self.state_encoder(inputs)
 
-        inputs: torch.Tensor = obs_tensor  # V-Critic: Just State
-        if action_tensor is not None:  # Q-Critic: Concatenate State + Action
-            inputs = torch.cat([obs_tensor, action_tensor], dim=2)
-
-        # Encode EVERYONE (Batch, Num_Agents, Hidden)
-        embeddings: torch.Tensor = self.state_encoder(inputs)
-
+    def attend_to_others(self, embeddings: torch.Tensor, num_agents: int, agent_index: int) -> torch.Tensor:
+        """Performs attention for agent i over all other agents."""
         # Extract "Me"
-        me_embedding: torch.Tensor = embeddings[:, agent_index, :]  # (Batch, Hidden)
+        me_embedding: torch.Tensor = embeddings[:, agent_index, :]
 
         # Extract "Others" (Masking logic)
         # We need to exclude 'agent_index' from the attention targets
-        mask: torch.Tensor = torch.ones(num_agents, dtype=torch.bool, device=obs_tensor.device)
-        mask[agent_index] = False
-        others_embeddings: torch.Tensor = embeddings[:, mask, :]  # (Batch, Num_Agents-1, Hidden)
+        other_indices: list[int] = [j for j in range(num_agents) if j != agent_index]
+        others_embeddings: torch.Tensor = embeddings[:, other_indices, :]
 
         # Attention
         # "Me" asks "How do the others affect my value?"
-        # No mask needed for 'others' (we assume all agents in training are real)
-        others_context: torch.Tensor = self.attention(me_embedding, others_embeddings)
+        context: torch.Tensor = self.attention(me_embedding, others_embeddings)
 
-        # Fusion
-        combined = torch.cat([me_embedding, others_context], dim=1)
+        # Fusion:
+        combined: torch.Tensor = torch.cat([me_embedding, context], dim=1)
         return combined
+
+    def get_q_embedding(self, obs_tensor: torch.Tensor, action_tensor: torch.Tensor, agent_index: int) -> torch.Tensor:
+        """
+        Calculates the embedding for agent i (for Q-value) by attending to all other agents.
+        Args:
+            obs_tensor: (Batch, Num_Agents, Obs_Dim)
+            action_tensor: (Batch, Num_Agents, Action_Dim)
+            agent_index: The index of the agent we are critiquing
+        Returns:
+            output_embedding: (Batch, Fusion_Dim)
+        """
+        num_agents: int = obs_tensor.shape[1]
+        inputs: torch.Tensor = torch.cat([obs_tensor, action_tensor], dim=2)
+
+        # Encode everyone
+        embeddings: torch.Tensor = self.get_all_embeddings(inputs)
+
+        # Attend to others
+        return self.attend_to_others(embeddings, num_agents, agent_index)

@@ -1,5 +1,5 @@
 from marl_models.base_model import MARLModel
-from marl_models.buffer_and_helpers import RolloutBuffer, ReplayBuffer
+from marl_models.buffer_and_helpers import ReplayBuffer, RolloutBuffer, AttentionRolloutBuffer
 from marl_models.utils import save_models
 from environment.env import Env
 from utils.logger import Logger, Log
@@ -14,7 +14,8 @@ import time
 
 def train_on_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: int) -> None:
     start_time: float = time.time()
-    buffer: RolloutBuffer = RolloutBuffer(num_agents=config.NUM_UAVS, obs_dim=config.OBS_DIM_SINGLE, action_dim=config.ACTION_DIM, buffer_size=config.PPO_ROLLOUT_LENGTH, device=model.device)
+    BufferClass: type[RolloutBuffer] = AttentionRolloutBuffer if "attention" in model.model_name.lower() else RolloutBuffer
+    buffer: RolloutBuffer = BufferClass(num_agents=config.NUM_UAVS, obs_dim=config.OBS_DIM_SINGLE, action_dim=config.ACTION_DIM, buffer_size=config.PPO_ROLLOUT_LENGTH, device=model.device)
     max_time_steps: int = num_episodes * config.STEPS_PER_EPISODE
     num_updates: int = max_time_steps // config.PPO_ROLLOUT_LENGTH
     assert num_updates > 0, "num_updates is 0, please modify settings."
@@ -39,13 +40,13 @@ def train_on_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: in
                 plot_snapshot(env, update, step, logger.log_dir, "update", logger.timestamp)
 
             obs_arr: np.ndarray = np.array(obs)
-            actions, log_probs, value = model.get_action_and_value(obs_arr, state)
+            actions, log_probs, values = model.get_action_and_value(obs_arr, state)
 
             next_obs, rewards, (total_latency, total_energy, jfi, offline_rate) = env.step(actions)
             # update_trajectories(env)  # tracking code, comment if not needed
             next_state: np.ndarray = np.concatenate(next_obs, axis=0)
             done: bool = step >= config.PPO_ROLLOUT_LENGTH
-            buffer.add(state, obs_arr, actions, log_probs, rewards, done, value)
+            buffer.add(state, obs_arr, actions, log_probs, rewards, done, values)
 
             obs = next_obs
             state = next_state
@@ -57,10 +58,9 @@ def train_on_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: in
             rollout_offline_rate = offline_rate
 
         with torch.no_grad():
-            _, _, last_value = model.get_action_and_value(np.array(obs), state)
-            last_values_arr: np.ndarray = np.array([last_value] * config.NUM_UAVS)
+            _, _, last_values = model.get_action_and_value(np.array(obs), state)
 
-        buffer.compute_returns_and_advantages(last_values_arr, config.DISCOUNT_FACTOR, config.PPO_GAE_LAMBDA)
+        buffer.compute_returns_and_advantages(last_values, config.DISCOUNT_FACTOR, config.PPO_GAE_LAMBDA)
 
         for _ in range(config.PPO_EPOCHS):
             for batch in buffer.get_batches(config.PPO_BATCH_SIZE):

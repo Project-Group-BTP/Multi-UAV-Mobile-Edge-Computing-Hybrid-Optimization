@@ -22,5 +22,5 @@ class CriticNetwork(AttentionCriticBase):
         self.q_head: nn.Sequential = nn.Sequential(layer_init(nn.Linear(self.fusion_dim, self.mlp_dim)), nn.LayerNorm(self.mlp_dim), nn.ReLU(), layer_init(nn.Linear(self.mlp_dim, 1)))
 
     def forward(self, obs_tensor: torch.Tensor, action_tensor: torch.Tensor, agent_index: int) -> torch.Tensor:
-        embedding: torch.Tensor = self.get_eval_embedding(obs_tensor, action_tensor, agent_index)
+        embedding: torch.Tensor = self.get_q_embedding(obs_tensor, action_tensor, agent_index)
         return self.q_head(embedding)
