@@ -264,7 +264,7 @@ class UAV:
 
     def _process_energy_request(self, ue: UE) -> None:
         """Process an emergency energy request from a UE."""
-        channel_gain: float = comms.calculate_channel_gain(self.pos, ue.pos) * 1e6
+        channel_gain: float = comms.calculate_channel_gain(self.pos, ue.pos)
         harv_energy: float = config.WPT_EFFICIENCY * config.WPT_TRANSMIT_POWER * channel_gain * config.TIME_SLOT_DURATION
         ue.update_battery(harv_energy, 0.0)
         ue.latency_current_request = 0.0  # No latency deadline for energy requests

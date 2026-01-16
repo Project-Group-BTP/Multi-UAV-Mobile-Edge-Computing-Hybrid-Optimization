@@ -19,7 +19,7 @@ class UE:
     def __init__(self, ue_id: int) -> None:
         self.id: int = ue_id
         self.pos: np.ndarray = np.array([np.random.uniform(0, config.AREA_WIDTH), np.random.uniform(0, config.AREA_HEIGHT), 0.0])
-        self.battery_level: float = config.UE_BATTERY_CAPACITY  # Start at full capacity
+        self.battery_level: float = np.random.uniform(0.6, 1.0) * config.UE_BATTERY_CAPACITY  # Start at capacity between 60% to 100%
 
         self.current_request: tuple[int, int, int] = (0, 0, 0)  # Request : (req_type, req_size, req_id)
         self.latency_current_request: float = 0.0  # Latency for the current request
@@ -83,6 +83,6 @@ class UE:
     def update_battery(self, harv_energy: float, ue_transmit_time: float) -> None:
         """Updates battery level based on consumption and harvesting."""
         consumed_energy: float = config.UE_STATIC_POWER * config.TIME_SLOT_DURATION
-        consumed_energy += config.TRANSMIT_POWER * ue_transmit_time * 2
+        consumed_energy += config.TRANSMIT_POWER * ue_transmit_time
         self.battery_level = min(config.UE_BATTERY_CAPACITY, self.battery_level - consumed_energy + harv_energy)
         self.battery_level = max(0.0, self.battery_level)

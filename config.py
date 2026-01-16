@@ -2,7 +2,8 @@ import numpy as np
 
 # Training Parameters
 MODEL: str = "maddpg"  # options: 'maddpg', 'matd3', 'mappo', 'masac', 'attention_<model>', 'random'
-SEED: int = 1234  # random seed for reproducibility
+SEED: int = 42  # random seed for reproducibility
+np.random.seed(SEED)  # set numpy random seed
 STEPS_PER_EPISODE: int = 1000  # total T
 LOG_FREQ: int = 10  # episodes
 IMG_FREQ: int = 100  # steps
@@ -16,13 +17,13 @@ NUM_UES: int = 200  # M
 AREA_WIDTH: int = 1000  # X_max in meters
 AREA_HEIGHT: int = 1000  # Y_max in meters
 TIME_SLOT_DURATION: float = 1.0  # tau in seconds
-UE_MAX_DIST: int = 20  # d_max^UE in meters
+UE_MAX_DIST: float = 15.0  # d_max^UE in meters
 UE_MAX_WAIT_TIME: int = 10  # in time slots
 
 # UAV Parameters
 UAV_ALTITUDE: int = 100  # H in meters
-UAV_SPEED: int = 30  # v^UAV in m/s
-UAV_STORAGE_CAPACITY: np.ndarray = np.random.choice(np.arange(25 * 10**6, 100 * 10**6, 10**6), size=NUM_UAVS).astype(np.int64)  # S_u in bytes
+UAV_SPEED: float = 15.0  # v^UAV in m/s
+UAV_STORAGE_CAPACITY: np.ndarray = np.random.choice(np.arange(40 * 10**6, 80 * 10**6, 10**6), size=NUM_UAVS).astype(np.int64)  # S_u in bytes
 UAV_COMPUTING_CAPACITY: np.ndarray = np.random.choice(np.arange(5 * 10**9, 20 * 10**9, 10**9), size=NUM_UAVS).astype(np.int64)  # F_u in cycles/sec
 UAV_SENSING_RANGE: float = 300.0  # R^sense in meters
 UAV_COVERAGE_RADIUS: float = 100.0  # R in meters
@@ -34,8 +35,8 @@ assert UAV_SENSING_RANGE >= MIN_UAV_SEPARATION
 
 # Collisions and Penalties
 COLLISION_AVOIDANCE_ITERATIONS: int = 20  # number of iterations to resolve collisions
-COLLISION_PENALTY: float = 100.0  # penalty per collision
-BOUNDARY_PENALTY: float = 100.0  # penalty for going out of bounds
+COLLISION_PENALTY: float = 10.0  # penalty per collision
+BOUNDARY_PENALTY: float = 10.0  # penalty for going out of bounds
 NON_SERVED_LATENCY_PENALTY: float = 20.0  # penalty in latency for non-served requests
 # IMPORTANT : Reconfigurable, should try for various values including : NUM_UAVS - 1 and NUM_UES
 MAX_UAV_NEIGHBORS: int = NUM_UAVS - 1
@@ -54,11 +55,11 @@ CPU_CYCLES_PER_BYTE: np.ndarray = np.random.randint(2000, 4000, size=NUM_SERVICE
 FILE_SIZES: np.ndarray = np.random.randint(10**6, 5 * 10**6, size=NUM_FILES).astype(np.int64)  # in bytes
 MIN_INPUT_SIZE: int = 1 * 10**6  # in bytes
 MAX_INPUT_SIZE: int = 5 * 10**6  # in bytes
-ZIPF_BETA: float = 0.6  # beta^Zipf
+ZIPF_BETA: float = 0.8  # beta^Zipf
 K_CPU: float = 1e-27  # CPU capacitance coefficient
 
 # Caching Parameters
-T_CACHE_UPDATE_INTERVAL: int = 10  # T_cache
+T_CACHE_UPDATE_INTERVAL: int = 50  # T_cache
 GDSF_SMOOTHING_FACTOR: float = 0.5  # beta^gdsf
 
 # Probabilistic Caching Parameters
@@ -74,18 +75,18 @@ BANDWIDTH_EDGE: int = 40 * 10**6  # B^edge in Hz
 BANDWIDTH_BACKHAUL: int = 10 * 10**6  # B^backhaul in Hz
 
 # WPT Parameters
-UE_BATTERY_CAPACITY: float = 20.0  # B_max in Joules
-UE_CRITICAL_THRESHOLD: float = 0.2 * UE_BATTERY_CAPACITY  # B_low in Joules
-WPT_TRANSMIT_POWER: float = 100.0  # P^WPT in Watts
-WPT_EFFICIENCY: float = 0.5  # eta (energy harvesting efficiency)
-UE_STATIC_POWER: float = 0.01  # Idle power consumption
+UE_BATTERY_CAPACITY: float = 100.0  # B_max in Joules
+UE_CRITICAL_THRESHOLD: float = 0.3 * UE_BATTERY_CAPACITY  # B_low in Joules
+WPT_TRANSMIT_POWER: float = 500.0 * 1e6  # P^WPT in Watts
+WPT_EFFICIENCY: float = 0.6  # eta (energy harvesting efficiency)
+UE_STATIC_POWER: float = 0.05  # Idle power consumption
 
 # Model Parameters
 
-ALPHA_1 = 8.0  # weightage for latency
-ALPHA_2 = 1.0  # weightage for energy
-ALPHA_3 = 4.0  # weightage for fairness
-ALPHA_4 = 4.0  # weightage for offline rate
+ALPHA_1 = 4.0  # weightage for latency
+ALPHA_2 = 0.4  # weightage for energy
+ALPHA_3 = 8.0  # weightage for fairness
+ALPHA_4 = 50.0  # weightage for offline rate
 REWARD_SCALING_FACTOR: float = 0.01  # scaling factor for rewards
 
 SELF_OBS_DIM: int = 2 + NUM_FILES  # pos (2) + cache (NUM_FILES)
@@ -108,10 +109,10 @@ EPSILON: float = 1e-9  # small value to prevent division by zero
 REPLAY_BUFFER_SIZE: int = 10**6  # B
 REPLAY_BATCH_SIZE: int = 256  # minibatch size
 INITIAL_RANDOM_STEPS: int = 5000  # steps of random actions for exploration
-LEARN_FREQ: int = 5  # steps to learn after
+LEARN_FREQ: int = 10  # steps to learn after
 
 # Gaussian Noise Parameters (for MADDPG and MATD3)
-INITIAL_NOISE_SCALE: float = 0.1
+INITIAL_NOISE_SCALE: float = 0.2
 MIN_NOISE_SCALE: float = 0.01
 NOISE_DECAY_RATE: float = 0.995
 
@@ -124,7 +125,7 @@ NOISE_CLIP: float = 0.5  # range to clip target policy smoothing noise
 PPO_ROLLOUT_LENGTH: int = STEPS_PER_EPISODE  # number of steps to collect per rollout before updating
 PPO_GAE_LAMBDA: float = 0.95  # lambda parameter for GAE
 PPO_EPOCHS: int = 10  # number of epochs to run on the collected rollout data
-PPO_BATCH_SIZE: int = 512  # size of mini-batches to use during the update step
+PPO_BATCH_SIZE: int = 200  # size of mini-batches to use during the update step
 PPO_CLIP_EPS: float = 0.2  # clipping parameter (epsilon) for the PPO surrogate objective
 PPO_ENTROPY_COEF: float = 0.01  # coefficient for the entropy bonus to encourage exploration
 
