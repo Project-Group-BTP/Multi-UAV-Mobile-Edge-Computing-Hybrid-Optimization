@@ -26,6 +26,8 @@ Basically all the above parameters affect each other, so on changing one you may
 - **(IMP)** T_CACHE_UPDATE_INTERVAL and GDSF_SMOOTHING_FACTOR : Tune these hyperparameters for better caching performance
 
 - UE_BATTERY_CAPACITY and UE_CRITICAL_THRESHOLD : Vary to emulate different UE battery scenarios
+  
+**IMP NOTE**: Optionally, can explore creating parallel environments for faster training.
 
 MARL Hyperparameters :
 
