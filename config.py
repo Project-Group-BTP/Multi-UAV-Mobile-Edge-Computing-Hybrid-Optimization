@@ -3,6 +3,9 @@ import numpy as np
 # Training Parameters
 MODEL: str = "maddpg"  # options: 'maddpg', 'matd3', 'mappo', 'masac', 'random'
 SEED: int = 1234  # random seed for reproducibility
+
+# Initialize random state for config parameters to ensure reproducibility
+_config_rng = np.random.RandomState(SEED)
 STEPS_PER_EPISODE: int = 1000  # total T
 LOG_FREQ: int = 10  # episodes
 IMG_FREQ: int = 100  # steps
@@ -22,8 +25,8 @@ UE_MAX_WAIT_TIME: int = 10  # in time slots
 # UAV Parameters
 UAV_ALTITUDE: int = 100  # H in meters
 UAV_SPEED: int = 30  # v^UAV in m/s
-UAV_STORAGE_CAPACITY: np.ndarray = np.random.choice(np.arange(5 * 10**6, 20 * 10**6, 10**6), size=NUM_UAVS)  # S_u in bytes
-UAV_COMPUTING_CAPACITY: np.ndarray = np.random.choice(np.arange(5 * 10**9, 20 * 10**9, 10**9), size=NUM_UAVS)  # F_u in cycles/sec
+UAV_STORAGE_CAPACITY: np.ndarray = _config_rng.choice(np.arange(5 * 10**6, 20 * 10**6, 10**6), size=NUM_UAVS)  # S_u in bytes
+UAV_COMPUTING_CAPACITY: np.ndarray = _config_rng.choice(np.arange(5 * 10**9, 20 * 10**9, 10**9), size=NUM_UAVS)  # F_u in cycles/sec
 UAV_SENSING_RANGE: float = 300.0  # R^sense in meters
 UAV_COVERAGE_RADIUS: float = 100.0  # R in meters
 MIN_UAV_SEPARATION: float = 200.0  # d_min in meters
@@ -48,8 +51,8 @@ POWER_HOVER: float = 80.0  # P_hover in Watts
 NUM_SERVICES: int = 50  # S
 NUM_CONTENTS: int = 100  # K
 NUM_FILES: int = NUM_SERVICES + NUM_CONTENTS  # S + K
-CPU_CYCLES_PER_BYTE: np.ndarray = np.random.randint(2000, 4000, size=NUM_SERVICES)  # omega_s_m
-FILE_SIZES: np.ndarray = np.random.randint(10**5, 5 * 10**5, size=NUM_FILES)  # in bytes
+CPU_CYCLES_PER_BYTE: np.ndarray = _config_rng.randint(2000, 4000, size=NUM_SERVICES)  # omega_s_m
+FILE_SIZES: np.ndarray = _config_rng.randint(10**5, 5 * 10**5, size=NUM_FILES)  # in bytes
 MIN_INPUT_SIZE: int = 1 * 10**5  # in bytes
 MAX_INPUT_SIZE: int = 5 * 10**5  # in bytes
 ZIPF_BETA: float = 0.6  # beta^Zipf
@@ -72,7 +75,7 @@ BANDWIDTH_BACKHAUL: int = 40 * 10**6  # B^backhaul in Hz
 ALPHA_1 = 8.0  # weightage for latency
 ALPHA_2 = 1.0  # weightage for energy
 ALPHA_3 = 4.0  # weightage for fairness
-REWARD_SCALING_FACTOR: float = 0.01  # scaling factor for rewards
+REWARD_SCALING_FACTOR: float = 0.1  # scaling factor for rewards (increased from 0.01 to avoid gradient vanishing)
 
 OBS_DIM_SINGLE: int = 2 + NUM_FILES + (MAX_UAV_NEIGHBORS * (2 + NUM_FILES)) + (MAX_ASSOCIATED_UES * (2 + 3))
 # own state: pos (2) + cache (NUM_FILES) + Neighbors: pos (2) + cache (NUM_FILES) + UEs: pos (2) + request_tuple (3)
