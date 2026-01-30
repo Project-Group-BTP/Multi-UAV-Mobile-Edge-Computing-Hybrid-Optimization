@@ -71,7 +71,7 @@ def train_on_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: in
         recent_rewards.append(rollout_reward)
         if trial:
             # Report average of last 5 updates to smooth out noise
-            current_avg_reward: float = float(np.mean(recent_rewards[-5:]))
+            current_avg_reward: float = float(np.mean(recent_rewards[-5:] if len(recent_rewards) >= 5 else recent_rewards))
             trial.report(current_avg_reward, update)
             if trial.should_prune():
                 raise optuna.TrialPruned()
@@ -194,7 +194,7 @@ def train_off_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: i
         recent_rewards.append(episode_reward)
         if trial:
             # Report average of last 10 episodes
-            current_avg_reward: float = float(np.mean(recent_rewards[-10:]))
+            current_avg_reward: float = float(np.mean(recent_rewards[-10:] if len(recent_rewards) >= 10 else recent_rewards))
             trial.report(current_avg_reward, episode)
             if trial.should_prune():
                 raise optuna.TrialPruned()

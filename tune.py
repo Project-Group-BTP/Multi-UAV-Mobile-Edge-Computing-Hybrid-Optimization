@@ -27,10 +27,10 @@ def objective(trial: optuna.Trial, stage: int, model_name: str, num_episodes: in
     # --- STAGE 1: Objective Tuning (Reward Weights & Caching) ---
     if stage == 1:
         # We tune the definition of "Success" first
-        config.ALPHA_1 = trial.suggest_float("alpha_1", 1.0, 15.0)  # Latency
-        config.ALPHA_2 = trial.suggest_float("alpha_2", 0.1, 5.0)  # Energy
-        config.ALPHA_3 = trial.suggest_float("alpha_3", 1.0, 10.0)  # Fairness
-        config.GDSF_SMOOTHING_FACTOR = trial.suggest_float("gdsf_beta", 0.1, 0.9)
+        config.ALPHA_1 = trial.suggest_float("alpha_1", 1.0, 15.0, step=0.5)  # Latency
+        config.ALPHA_2 = trial.suggest_float("alpha_2", 0.1, 5.0, step=0.1)  # Energy
+        config.ALPHA_3 = trial.suggest_float("alpha_3", 1.0, 10.0, step=0.1)  # Fairness
+        config.GDSF_SMOOTHING_FACTOR = trial.suggest_float("gdsf_beta", 0.1, 0.9, step=0.05)
 
     # --- STAGE 2: Agent Tuning (Hyperparameters) ---
     elif stage == 2:
@@ -40,7 +40,7 @@ def objective(trial: optuna.Trial, stage: int, model_name: str, num_episodes: in
         config.CRITIC_LR = trial.suggest_float("critic_lr", 1e-5, 1e-3, log=True)
         config.PPO_BATCH_SIZE = trial.suggest_categorical("batch_size", [32, 64, 128])
         config.MLP_HIDDEN_DIM = trial.suggest_categorical("hidden_dim", [128, 256, 512])
-        config.DISCOUNT_FACTOR = trial.suggest_float("gamma", 0.90, 0.99)
+        config.DISCOUNT_FACTOR = trial.suggest_float("gamma", 0.90, 0.99, step=0.01)
 
     # --- Setup Environment & Model ---
     np.random.seed(config.SEED + trial.number)  # Change seed per trial
@@ -163,7 +163,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--episodes",
         type=int,
-        default=200,
+        default=1000,
         help="Episodes per trial (Lower than full training)",
     )
     parser.add_argument(
