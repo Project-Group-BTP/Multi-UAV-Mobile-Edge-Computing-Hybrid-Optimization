@@ -10,11 +10,7 @@ class Log:
         self.latencies: list[float] = []
         self.energies: list[float] = []
         self.fairness_scores: list[float] = []
-        # Training losses (optional, may be empty for random baseline)
-        self.actor_losses: list[float | None] = []
-        self.critic_losses: list[float | None] = []
-        self.entropy_losses: list[float | None] = []
-        self.alpha_losses: list[float | None] = []
+        self.offline_rates: list[float] = []   
 
     def append(
         self,
@@ -22,6 +18,7 @@ class Log:
         latency: float,
         energy: float,
         fairness: float,
+        offline_rate: float,
         *,
         actor_loss: float | None = None,
         critic_loss: float | None = None,
@@ -32,10 +29,17 @@ class Log:
 
         Parameters are averaged/aggregated externally by training loop before being passed here.
         """
+        # Training losses (optional, may be empty for random baseline)
+        self.actor_losses: list[float | None] = []
+        self.critic_losses: list[float | None] = []
+        self.entropy_losses: list[float | None] = []
+        self.alpha_losses: list[float | None] = []
+        
         self.rewards.append(reward)
         self.latencies.append(latency)
         self.energies.append(energy)
         self.fairness_scores.append(fairness)
+        self.offline_rates.append(offline_rate)
 
         self.actor_losses.append(actor_loss)
         self.critic_losses.append(critic_loss)
@@ -109,12 +113,14 @@ class Logger:
         latencies_slice: np.ndarray = np.array(log.latencies[-log_freq:])
         energies_slice: np.ndarray = np.array(log.energies[-log_freq:])
         fairness_slice: np.ndarray = np.array(log.fairness_scores[-log_freq:])
+        offline_slice: np.ndarray = np.array(log.offline_rates[-log_freq:])
 
         reward_avg: float = float(np.mean(rewards_slice))
         latency_avg: float = float(np.mean(latencies_slice))
         energy_avg: float = float(np.mean(energies_slice))
         fairness_avg: float = float(np.mean(fairness_slice))
-
+        offline_avg: float = float(np.mean(offline_slice))
+        
         # Prepare loss averages from the Log object if available; prefer explicit `losses` dict when provided
         def _safe_mean(lst: list) -> float | None:
             if not lst:
@@ -163,6 +169,7 @@ class Logger:
             f"Total Latency: {latency_avg:.3f} | "
             f"Total Energy: {energy_avg:.3f} | "
             f"Final Fairness: {fairness_avg:.3f} | "
+            f"Offline Rate: {offline_avg:.3f} | "
             + loss_str
             + f"Elapsed Time: {elapsed_time:.2f}s\n"
         )
@@ -177,6 +184,7 @@ class Logger:
             "latency": latency_avg,
             "energy": energy_avg,
             "fairness": fairness_avg,
+            "offline_rate": offline_avg,
             "time": elapsed_time,
         }
         if actor_avg is not None:

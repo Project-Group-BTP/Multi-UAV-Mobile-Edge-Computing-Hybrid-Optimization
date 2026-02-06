@@ -1,6 +1,7 @@
 from marl_models.base_model import OffPolicyExperienceBatch
 import config
 import torch
+import torch.nn as nn
 import numpy as np
 from collections import deque
 from collections.abc import Generator
@@ -30,16 +31,16 @@ class ReplayBuffer:
 
 
 class RolloutBuffer:
-    def __init__(self, num_agents: int, obs_dim: int, action_dim: int, state_dim: int, buffer_size: int, device: str) -> None:
+    def __init__(self, num_agents: int, obs_dim: int, action_dim: int, buffer_size: int, device: str) -> None:
         self.num_agents: int = num_agents
         self.obs_dim: int = obs_dim
         self.action_dim: int = action_dim
-        self.state_dim: int = state_dim
+        self.state_dim: int = obs_dim * num_agents
         self.buffer_size: int = buffer_size
         self.device: str = device
 
         # Initialize storage
-        self.states: np.ndarray = np.zeros((buffer_size, state_dim), dtype=np.float32)
+        self.states: np.ndarray = np.zeros((buffer_size, self.state_dim), dtype=np.float32)
         self.observations: np.ndarray = np.zeros((buffer_size, num_agents, obs_dim), dtype=np.float32)
         self.actions: np.ndarray = np.zeros((buffer_size, num_agents, action_dim), dtype=np.float32)
         self.log_probs: np.ndarray = np.zeros((buffer_size, num_agents), dtype=np.float32)
@@ -53,11 +54,10 @@ class RolloutBuffer:
 
         self.step: int = 0
 
-    def add(self, state: np.ndarray, obs: np.ndarray, actions: np.ndarray, log_probs: np.ndarray, rewards: list[float], done: bool, value: np.ndarray) -> None:
+    def add(self, state: np.ndarray, obs: np.ndarray, actions: np.ndarray, log_probs: np.ndarray, rewards: list[float], done: bool, values: np.ndarray) -> None:
         if self.step >= self.buffer_size:
             raise ValueError("Rollout buffer overflow")
         dones: np.ndarray = np.array([done] * config.NUM_UAVS)
-        values: np.ndarray = np.array([value] * config.NUM_UAVS)
         self.states[self.step] = state
         self.observations[self.step] = obs
         self.actions[self.step] = actions
@@ -72,11 +72,7 @@ class RolloutBuffer:
         """Computes the advantages and returns for the collected trajectories using GAE."""
         last_gae_lam: float = 0.0
         for t in reversed(range(self.buffer_size)):
-            if t == self.buffer_size - 1:
-                next_values: np.ndarray = last_values
-            else:
-                next_values = self.values[t + 1]
-
+            next_values: np.ndarray = last_values if t == self.buffer_size - 1 else self.values[t + 1]
             delta: np.ndarray = self.rewards[t] + gamma * next_values * (1.0 - self.dones[t]) - self.values[t]
             self.advantages[t] = last_gae_lam = delta + gamma * gae_lambda * (1.0 - self.dones[t]) * last_gae_lam
 
@@ -114,7 +110,31 @@ class RolloutBuffer:
         self.step = 0
 
 
-def soft_update(target_net: torch.nn.Module, source_net: torch.nn.Module, tau: float):
+class AttentionRolloutBuffer(RolloutBuffer):
+    """Subclass of RolloutBuffer that preserves the (Batch, Num_Agents, Dim) structure required for Graph Attention."""
+
+    def get_batches(self, batch_size: int):
+        # batch_size here represents "Number of Time Steps" per batch
+        num_time_steps: int = self.buffer_size  # Total T
+        indices: np.ndarray = np.random.permutation(num_time_steps)
+
+        # We do NOT flatten observations or actions here and keep (Buffer_Size, Num_Agents, Dim)
+        for start in range(0, num_time_steps, batch_size):
+            end: int = start + batch_size
+            batch_indices: np.ndarray = indices[start:end]
+
+            yield {
+                "states": torch.as_tensor(self.states[batch_indices], device=self.device),
+                "obs": torch.as_tensor(self.observations[batch_indices], device=self.device),
+                "actions": torch.as_tensor(self.actions[batch_indices], device=self.device),
+                "old_log_probs": torch.as_tensor(self.log_probs[batch_indices], device=self.device),
+                "advantages": torch.as_tensor(self.advantages[batch_indices], device=self.device),
+                "returns": torch.as_tensor(self.returns[batch_indices], device=self.device),
+                "old_values": torch.as_tensor(self.values[batch_indices], device=self.device),
+            }
+
+
+def soft_update(target_net: nn.Module, source_net: nn.Module, tau: float):
     """Performs a soft update of the target network's parameters."""
     with torch.no_grad():
         for target_param, param in zip(target_net.parameters(), source_net.parameters()):
@@ -135,3 +155,11 @@ class GaussianNoise:
 
     def reset(self) -> None:
         self.scale = config.INITIAL_NOISE_SCALE
+
+
+def layer_init(layer: nn.Linear, std: float = np.sqrt(2), bias_const: float = 0.0) -> nn.Linear:
+    """Added orthogonal initialization for better training stability"""
+    nn.init.orthogonal_(layer.weight, std)
+    if layer.bias is not None:
+        nn.init.constant_(layer.bias, bias_const)
+    return layer

@@ -1,5 +1,5 @@
 from marl_models.base_model import MARLModel
-from marl_models.buffer_and_helpers import RolloutBuffer, ReplayBuffer
+from marl_models.buffer_and_helpers import ReplayBuffer, RolloutBuffer, AttentionRolloutBuffer
 from marl_models.utils import save_models
 from environment.env import Env
 from utils.logger import Logger, Log
@@ -15,23 +15,14 @@ import optuna
 
 def train_on_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: int, trial: optuna.Trial | None = None) -> float:
     start_time: float = time.time()
-    buffer: RolloutBuffer = RolloutBuffer(
-        num_agents=config.NUM_UAVS,
-        obs_dim=config.OBS_DIM_SINGLE,
-        action_dim=config.ACTION_DIM,
-        state_dim=config.STATE_DIM,
-        buffer_size=config.PPO_ROLLOUT_LENGTH,
-        device=model.device,
-    )
+    BufferClass: type[RolloutBuffer] = AttentionRolloutBuffer if "attention" in model.model_name.lower() else RolloutBuffer
+    buffer: RolloutBuffer = BufferClass(num_agents=config.NUM_UAVS, obs_dim=config.OBS_DIM_SINGLE, action_dim=config.ACTION_DIM, buffer_size=config.PPO_ROLLOUT_LENGTH, device=model.device)
     max_time_steps: int = num_episodes * config.STEPS_PER_EPISODE
     num_updates: int = max_time_steps // config.PPO_ROLLOUT_LENGTH
     assert num_updates > 0, "num_updates is 0, please modify settings."
     save_freq: int = num_episodes // 10
     if num_episodes < 1000:
         save_freq = 100
-    print(f"Total updates to be performed: {num_updates}")
-    print(f"Each update has {config.PPO_ROLLOUT_LENGTH} steps.")
-    print(f"Updates for {config.PPO_EPOCHS} epochs with batch size {config.PPO_BATCH_SIZE}.")
     rollout_log: Log = Log()
     accumulated_losses: dict = {"actor": [], "critic": [], "entropy": []}
     recent_rewards: list[float] = [] # Tracking metrics for tuning
@@ -43,6 +34,7 @@ def train_on_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: in
         rollout_latency: float = 0.0
         rollout_energy: float = 0.0
         rollout_fairness: float = 0.0
+        rollout_offline_rate: float = 0.0
         # reset_trajectories(env)  # tracking code, comment if not needed
         plot_snapshot(env, update, 0, logger.log_dir, "update", logger.timestamp, True)
 
@@ -51,13 +43,13 @@ def train_on_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: in
                 plot_snapshot(env, update, step, logger.log_dir, "update", logger.timestamp)
 
             obs_arr: np.ndarray = np.array(obs)
-            actions, log_probs, value = model.get_action_and_value(obs_arr, state)
+            actions, log_probs, values = model.get_action_and_value(obs_arr, state)
 
-            next_obs, rewards, (total_latency, total_energy, jfi) = env.step(actions)
+            next_obs, rewards, (total_latency, total_energy, jfi, offline_rate) = env.step(actions)
             # update_trajectories(env)  # tracking code, comment if not needed
             next_state: np.ndarray = np.concatenate(next_obs, axis=0)
             done: bool = step >= config.PPO_ROLLOUT_LENGTH
-            buffer.add(state, obs_arr, actions, log_probs, rewards, done, value)
+            buffer.add(state, obs_arr, actions, log_probs, rewards, done, values)
 
             obs = next_obs
             state = next_state
@@ -66,6 +58,7 @@ def train_on_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: in
             rollout_latency += total_latency
             rollout_energy += total_energy
             rollout_fairness = jfi
+            rollout_offline_rate = offline_rate
 
         # Optuna Pruning Check
         recent_rewards.append(rollout_reward)
@@ -77,10 +70,9 @@ def train_on_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: in
                 raise optuna.TrialPruned()
 
         with torch.no_grad():
-            _, _, last_value = model.get_action_and_value(np.array(obs), state)
-            last_values_arr: np.ndarray = np.array([last_value] * config.NUM_UAVS)
+            _, _, last_values = model.get_action_and_value(np.array(obs), state)
 
-        buffer.compute_returns_and_advantages(last_values_arr, config.DISCOUNT_FACTOR, config.PPO_GAE_LAMBDA)
+        buffer.compute_returns_and_advantages(last_values, config.DISCOUNT_FACTOR, config.PPO_GAE_LAMBDA)
 
         for _ in range(config.PPO_EPOCHS):
             for batch in buffer.get_batches(config.PPO_BATCH_SIZE):
@@ -92,7 +84,7 @@ def train_on_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: in
 
         buffer.clear()
 
-        rollout_log.append(rollout_reward, rollout_latency, rollout_energy, rollout_fairness)
+        rollout_log.append(rollout_reward, rollout_latency, rollout_energy, rollout_fairness, rollout_offline_rate)
         if update % config.LOG_FREQ == 0:
             elapsed_time: float = time.time() - start_time
             # Prepare averaged losses for logging
@@ -132,6 +124,7 @@ def train_off_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: i
         episode_latency: float = 0.0
         episode_energy: float = 0.0
         episode_fairness: float = 0.0
+        episode_offline_rate: float = 0.0
         # reset_trajectories(env)  # tracking code, comment if not needed
         plot_snapshot(env, episode, 0, logger.log_dir, "episode", logger.timestamp, True)
 
@@ -145,7 +138,7 @@ def train_off_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: i
             else:
                 actions = model.select_actions(obs, exploration=True)
 
-            next_obs, rewards, (total_latency, total_energy, jfi) = env.step(actions)
+            next_obs, rewards, (total_latency, total_energy, jfi, offline_rate) = env.step(actions)
             # update_trajectories(env)  # tracking code, comment if not needed
             done: bool = step >= config.STEPS_PER_EPISODE
             buffer.add(obs, actions, rewards, next_obs, done)
@@ -164,10 +157,11 @@ def train_off_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: i
             episode_latency += total_latency
             episode_energy += total_energy
             episode_fairness = jfi
+            episode_offline_rate = offline_rate
             if done:
                 break
 
-        episode_log.append(episode_reward, episode_latency, episode_energy, episode_fairness)
+        episode_log.append(episode_reward, episode_latency, episode_energy, episode_fairness, episode_offline_rate)
         if episode % config.LOG_FREQ == 0:
             elapsed_time: float = time.time() - start_time
             # Prepare averaged losses for logging
@@ -215,6 +209,7 @@ def train_random(env: Env, model: MARLModel, logger: Logger, num_episodes: int) 
         episode_latency: float = 0.0
         episode_energy: float = 0.0
         episode_fairness: float = 0.0
+        episode_offline_rate: float = 0.0
         # reset_trajectories(env)  # tracking code, comment if not needed
         plot_snapshot(env, episode, 0, logger.log_dir, "episode", logger.timestamp, True)
 
@@ -223,7 +218,7 @@ def train_random(env: Env, model: MARLModel, logger: Logger, num_episodes: int) 
                 plot_snapshot(env, episode, step, logger.log_dir, "episode", logger.timestamp)
 
             actions: np.ndarray = model.select_actions(obs, exploration=False)
-            next_obs, rewards, (total_latency, total_energy, jfi) = env.step(actions)
+            next_obs, rewards, (total_latency, total_energy, jfi, offline_rate) = env.step(actions)
             # update_trajectories(env)  # tracking code, comment if not needed
             done: bool = step >= config.STEPS_PER_EPISODE
             obs = next_obs
@@ -232,10 +227,11 @@ def train_random(env: Env, model: MARLModel, logger: Logger, num_episodes: int) 
             episode_latency += total_latency
             episode_energy += total_energy
             episode_fairness = jfi
+            episode_offline_rate = offline_rate
             if done:
                 break
 
-        episode_log.append(episode_reward, episode_latency, episode_energy, episode_fairness)
+        episode_log.append(episode_reward, episode_latency, episode_energy, episode_fairness, episode_offline_rate)
         if episode % config.LOG_FREQ == 0:
             elapsed_time: float = time.time() - start_time
             logger.log_metrics(episode, episode_log, config.LOG_FREQ, elapsed_time, "episode", losses=None)

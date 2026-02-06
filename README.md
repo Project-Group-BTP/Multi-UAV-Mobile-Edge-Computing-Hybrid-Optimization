@@ -1,16 +1,19 @@
-# Multi-UAV Assisted Mobile Edge Computing: A Hybrid Optimization Approach
+# Multi-UAV Assisted Wireless Powered Mobile Edge Computing: A Hybrid Optimization Approach
 
 ## Objective
 
-The primary objective of this research is to develop a framework for a multi-UAV-assisted collaborative Mobile Edge Computing (MEC) network. We aim to jointly optimize four interdependent components: task offloading decisions, service caching placement, content caching strategies, and UAV trajectories. The goal is to minimize a weighted sum of service latency and system-wide energy consumption while simultaneously maximizing user fairness.
+The primary objective of this research is to develop a framework for a multi-UAV-assisted collaborative Mobile Edge Computing (MEC) network. We aim to jointly optimize the interdependent components: task offloading decisions, service caching placement, content caching strategies, UAV trajectories and wireless power transfer. The goal is to minimize service latency, system-wide energy consumption, device offline rate while simultaneously maximizing user fairness.
 
-We are aiming to implement a hybrid optimization approach that combines **multi-agent deep reinforcement learning** with **collaborative and adaptive caching policies**. We are trying to create a generic framework that can be used with different models for finding the best-suited one for our purpose. Also trying to incorporate modern Python practices and type annotations. Developed using Python 3.12.0 and PyTorch 2.8.0.
+We are aiming to implement a hybrid optimization approach that combines **multi-agent deep reinforcement learning** with **collaborative and adaptive caching policies**. We are trying to create a generic framework that can be used with different models for finding the best-suited one for our purpose. We are also exploring incorporating attention mechanisms within the multi-agent reinforcement learning models for scalability and improved performance.
+
+Also trying to incorporate modern Python practices and type annotations. Developed using Python 3.12.0 and PyTorch 2.8.0.
 
 Currently included MARL models:
 - MADDPG (Multi-Agent Deep Deterministic Policy Gradient)
 - MATD3 (Multi-Agent Twin Delayed Deep Deterministic Policy Gradient)
 - MAPPO (Multi-Agent Proximal Policy Optimization)
 - MASAC (Multi-Agent Soft Actor-Critic)
+- Attention based versions of above models
 - Random baseline
 
 ![System Model](docs/system_model.jpg)
@@ -31,15 +34,27 @@ Directory Structure:
 │   ├── maddpg
 │   │   ├── agents.py
 │   │   └── maddpg.py
+│   ├── attention_maddpg
+│   │   ├── agents.py
+│   │   └── attention_maddpg.py
 │   ├── matd3
 │   │   ├── agents.py
 │   │   └── matd3.py
+│   ├── attention_matd3
+│   │   ├── agents.py
+│   │   └── attention_matd3.py
 │   ├── mappo
 │   │   ├── agents.py
 │   │   └── mappo.py
+│   ├── attention_mappo
+│   │   ├── agents.py
+│   │   └── attention_mappo.py
 │   ├── masac
 │   │   ├── agents.py
 │   │   └── masac.py
+│   ├── attention_masac
+│   │   ├── agents.py
+│   │   └── attention_masac.py
 │   └── random_baseline
 │       └── random_model.py
 ├── utils
@@ -50,7 +65,6 @@ Directory Structure:
 ├── train.py
 ├── test.py
 ├── main.py
-├── visualize.py
 ├── requirements.txt
 ├── README.md
 ├── .gitignore
@@ -92,12 +106,6 @@ To test a saved model, you must provide the path to the model's directory and it
 ```bash
 # Start testing, with saved model path and config file saved during that model's training run (to load and use the same settings).
 python main.py test --num_episodes=<total_episodes> --model_path="<path_to_model_directory>" --config_path="<path_to_saved_config>"
-```
-
-A temporary script to run the environment with random actions and visualize the state for just testing the environment alone. Run using:
-
-```bash
-python visualize.py
 ```
 
 **PS: Currently under rapid development and may be subject to significant changes.**
