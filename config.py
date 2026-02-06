@@ -77,17 +77,18 @@ BANDWIDTH_BACKHAUL: int = 10 * 10**6  # B^backhaul in Hz
 # WPT Parameters
 UE_BATTERY_CAPACITY: float = 100.0  # B_max in Joules
 UE_CRITICAL_THRESHOLD: float = 0.3 * UE_BATTERY_CAPACITY  # B_low in Joules
-WPT_TRANSMIT_POWER: float = 500.0 * 1e6  # P^WPT in Watts
-WPT_EFFICIENCY: float = 0.6  # eta (energy harvesting efficiency)
-UE_STATIC_POWER: float = 0.05  # Idle power consumption
+WPT_TRANSMIT_POWER: float = 500.0 * 1e6  # P^WPT in Watts (UAV WPT transmit power for energy harvesting)
+WPT_EFFICIENCY: float = 0.6  # eta (energy harvesting efficiency, 60%)
+UE_STATIC_POWER: float = 0.05  # Idle power consumption in Watts
 
 # Model Parameters
-
-ALPHA_1 = 4.0  # weightage for latency
-ALPHA_2 = 0.4  # weightage for energy
-ALPHA_3 = 8.0  # weightage for fairness
-ALPHA_4 = 50.0  # weightage for offline rate
-REWARD_SCALING_FACTOR: float = 0.01  # scaling factor for rewards
+# Reward formula: reward = ALPHA_3*log(fairness) - ALPHA_1*log(latency) - ALPHA_2*log(energy) - ALPHA_4*log(1+offline_rate)
+# Then scaled by REWARD_SCALING_FACTOR. All log terms ∈ [0, log(max_value)] to keep rewards bounded.
+ALPHA_1 = 4.0  # weightage for latency (negative term, higher = stronger penalty for latency)
+ALPHA_2 = 0.4  # weightage for energy (negative term, lower priority than latency)
+ALPHA_3 = 8.0  # weightage for fairness (positive term, encourage equal service)
+ALPHA_4 = 50.0  # weightage for offline rate (negative term, penalizes UEs running out of battery)
+REWARD_SCALING_FACTOR: float = 0.01  # scaling factor for rewards (prevents exploding values)
 
 SELF_OBS_DIM: int = 2 + NUM_FILES  # pos (2) + cache (NUM_FILES)
 UE_OBS_DIM: int = 2 + 3 + 1  # pos (2) + request_tuple (3) + battery level (1)
@@ -135,3 +136,4 @@ ALPHA_LR: float = 3e-4  # learning rate for the entropy temperature alpha
 # Attention Hyperparameters
 ATTN_HIDDEN_DIM: int = 64  # Embedding size for internal attention representations
 ATTN_NUM_HEADS: int = 4  # Number of attention heads
+assert ATTN_HIDDEN_DIM % ATTN_NUM_HEADS == 0, f"ATTN_HIDDEN_DIM ({ATTN_HIDDEN_DIM}) must be divisible by ATTN_NUM_HEADS ({ATTN_NUM_HEADS})"

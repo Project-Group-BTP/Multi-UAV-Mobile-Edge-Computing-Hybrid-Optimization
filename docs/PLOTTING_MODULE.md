@@ -49,6 +49,7 @@ compare_algorithms(
 - `latency_vs_episode.png`
 - `energy_vs_episode.png`
 - `fairness_vs_episode.png`
+- `offline_rate_vs_episode.png`
 - `actor_loss_vs_episode.png` (if available)
 - `critic_loss_vs_episode.png` (if available)
 - `entropy_loss_vs_episode.png` (MAPPO only)
@@ -60,9 +61,10 @@ compare_algorithms(
 - `comparison_latency.png`
 - `comparison_energy.png`
 - `comparison_fairness.png`
+- `comparison_offline_rate.png`
 - `comparison_actor_loss.png`
 - `comparison_critic_loss.png`
-- `comparison_summary.png` (6-panel grid)
+- `comparison_summary.png` (8-panel grid)
 
 ## Typical Workflow
 

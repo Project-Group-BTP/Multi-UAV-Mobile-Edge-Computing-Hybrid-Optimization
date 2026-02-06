@@ -22,25 +22,64 @@ def objective(trial: optuna.Trial, stage: int, model_name: str, num_episodes: in
     """
     Optuna Objective Function.
     Adjusts config based on 'stage' and runs a training session.
+    
+    Tuning Strategy:
+    ================
+    STAGE 1: Reward Function Weights (Objective Definition)
+        - Tune ALPHA_1 (latency), ALPHA_2 (energy), ALPHA_3 (fairness), ALPHA_4 (offline rate)
+        - Tune GDSF_SMOOTHING_FACTOR (caching decay)
+        - Goal: Find the right balance of objectives
+        
+    STAGE 2: Agent Hyperparameters (Solver Tuning)
+        - Tune ACTOR_LR, CRITIC_LR (learning rates)
+        - Tune MLP_HIDDEN_DIM (network capacity)
+        - Tune PPO_BATCH_SIZE (for on-policy) or REPLAY_BATCH_SIZE (for off-policy)
+        - Tune DISCOUNT_FACTOR (temporal credit assignment)
+        - Goal: Find optimal hyperparameters for the reward function from Stage 1
+        
+    STAGE 3: Architecture Hyperparameters (Attention-specific, if using attention models)
+        - Tune ATTN_HIDDEN_DIM, ATTN_NUM_HEADS (attention layer capacity)
+        - Goal: Optimize attention mechanism for the problem
     """
 
     # --- STAGE 1: Objective Tuning (Reward Weights & Caching) ---
     if stage == 1:
-        # We tune the definition of "Success" first
-        config.ALPHA_1 = trial.suggest_float("alpha_1", 1.0, 15.0, step=0.5)  # Latency
-        config.ALPHA_2 = trial.suggest_float("alpha_2", 0.1, 5.0, step=0.1)  # Energy
-        config.ALPHA_3 = trial.suggest_float("alpha_3", 1.0, 10.0, step=0.1)  # Fairness
-        config.GDSF_SMOOTHING_FACTOR = trial.suggest_float("gdsf_beta", 0.1, 0.9, step=0.05)
+        # We tune the definition of "Success" first - what matters most in the problem?
+        config.ALPHA_1 = trial.suggest_float("alpha_1", 1.0, 15.0, step=0.5)  # Latency penalty weight
+        config.ALPHA_2 = trial.suggest_float("alpha_2", 0.1, 5.0, step=0.1)  # Energy penalty weight
+        config.ALPHA_3 = trial.suggest_float("alpha_3", 1.0, 10.0, step=0.1)  # Fairness bonus weight
+        config.ALPHA_4 = trial.suggest_float("alpha_4", 5.0, 100.0, step=5)  # Offline rate penalty (5-100)
+        config.GDSF_SMOOTHING_FACTOR = trial.suggest_float("gdsf_beta", 0.1, 0.9, step=0.05)  # Cache EMA decay
 
     # --- STAGE 2: Agent Tuning (Hyperparameters) ---
     elif stage == 2:
         # We tune the solver to reach the success defined in Stage 1
-        # (Assuming Stage 1 params are hardcoded/loaded in config.py now)
+        # NOTE: Before running Stage 2, you should load the best Stage 1 parameters:
+        #   with open("tuning_logs/{model_name}/stage_1.json", "r") as f:
+        #       best_params = json.load(f)["best_params"]
+        #       config.ALPHA_1 = best_params["alpha_1"]
+        #       config.ALPHA_2 = best_params["alpha_2"]
+        #       ... (set all ALPHA and GDSF values)
         config.ACTOR_LR = trial.suggest_float("actor_lr", 1e-5, 1e-3, log=True)
         config.CRITIC_LR = trial.suggest_float("critic_lr", 1e-5, 1e-3, log=True)
         config.PPO_BATCH_SIZE = trial.suggest_categorical("batch_size", [32, 64, 128])
         config.MLP_HIDDEN_DIM = trial.suggest_categorical("hidden_dim", [128, 256, 512])
         config.DISCOUNT_FACTOR = trial.suggest_float("gamma", 0.90, 0.99, step=0.01)
+    
+    # --- STAGE 3: Attention Architecture (for attention-based models) ---
+    elif stage == 3:
+        if "attention" not in model_name.lower():
+            raise ValueError(f"Stage 3 is only for attention models. Got: {model_name}")
+        # Tune attention-specific hyperparameters
+        # Note: ATTN_HIDDEN_DIM must be divisible by ATTN_NUM_HEADS (config.py validates this)
+        config.ATTN_HIDDEN_DIM = trial.suggest_categorical("attn_hidden_dim", [32, 64, 128, 256])
+        config.ATTN_NUM_HEADS = trial.suggest_categorical("attn_num_heads", [1, 2, 4, 8])
+        # Ensure divisibility constraint
+        while config.ATTN_HIDDEN_DIM % config.ATTN_NUM_HEADS != 0:
+            config.ATTN_NUM_HEADS = trial.suggest_categorical("attn_num_heads", [1, 2, 4, 8])
+    
+    else:
+        raise ValueError(f"Invalid stage: {stage}. Choose from [1, 2, 3]")
 
     # --- Setup Environment & Model ---
     np.random.seed(config.SEED + trial.number)  # Change seed per trial
@@ -59,10 +98,12 @@ def objective(trial: optuna.Trial, stage: int, model_name: str, num_episodes: in
     # --- Execution ---
     try:
         final_score: float = 0.0
-        if model_name in ["maddpg", "matd3", "masac"]:
+        if model_name in ["maddpg", "matd3", "masac", "attention_maddpg", "attention_matd3", "attention_masac"]:
             final_score = train_off_policy(env, model, logger, num_episodes, 0, trial)
-        elif model_name == "mappo":
+        elif model_name in ["mappo", "attention_mappo"]:
             final_score = train_on_policy(env, model, logger, num_episodes, trial)
+        else:
+            raise ValueError(f"Unsupported model for tuning: {model_name}")
 
         return final_score
 
@@ -107,7 +148,7 @@ def run_tuning(args):
     save_path = f"tuning_logs/{config.MODEL}/stage_{args.stage}.json"
     if not os.path.exists(os.path.dirname(save_path)):
         os.makedirs(os.path.dirname(save_path))
-    
+
     results = {
         "best_params": study.best_params,
         "best_value": study.best_value,
@@ -115,11 +156,11 @@ def run_tuning(args):
         "n_trials": len(study.trials),
         "n_pruned": len([t for t in study.trials if t.state == optuna.trial.TrialState.PRUNED]),
     }
-    
+
     with open(save_path, "w") as f:
         json.dump(results, f, indent=4)
     print(f"💾 Saved best parameters to {save_path}")
-    
+
     # Generate plots
     try:
         plot_tuning_results(study, config.MODEL, args.stage)
@@ -154,13 +195,25 @@ def plot_tuning_results(study: optuna.Study, model_name: str, stage: int) -> Non
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Hyperparameter Tuning Module")
+    parser = argparse.ArgumentParser(
+        description="Hyperparameter Tuning Module",
+        epilog="""Examples:
+  Stage 1 (Objective tuning):
+    python tune.py --stage 1 --episodes 500 --trials 50
+    
+  Stage 2 (Agent hyperparameter tuning - after loading Stage 1 best params):
+    python tune.py --stage 2 --episodes 1000 --trials 50
+    
+  Stage 3 (Attention architecture tuning - attention models only):
+    python tune.py --stage 3 --episodes 500 --trials 30
+        """
+    )
     parser.add_argument(
         "--stage",
         type=int,
-        choices=[1, 2],
+        choices=[1, 2, 3],
         required=True,
-        help="1: Tune Rewards/Env, 2: Tune Agent",
+        help="1: Tune Rewards/Env, 2: Tune Agent Hyperparams, 3: Tune Attention Architecture (attention models only)",
     )
     parser.add_argument(
         "--episodes",

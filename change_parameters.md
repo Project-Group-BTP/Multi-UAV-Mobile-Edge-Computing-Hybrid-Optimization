@@ -2,7 +2,7 @@
 
 NOTE : Please do try to design a better reward function and improve algorithms/models/buffers etc. 
 
-- MODEL : Try across different models
+- MODEL : Try across different models (maddpg, matd3, mappo, masac, attention_maddpg, attention_matd3, attention_mappo, attention_masac)
 - STEPS_PER_EPISODE : Can try different episode lengths
 - LOG, IMG FREQS : Change as per convenience
 
@@ -39,11 +39,16 @@ Some model improvement related suggestions, can try as per requirement:
 Though you can try changing/fixing all of them, still the below are the most important ones for hyperparameter tuning:
 
 - **(IMP)** ALPHA_1, ALPHA_2, ALPHA_3, ALPHA_4, REWARD_SCALING_FACTOR : Adjust weights for different components of reward function
+  - ALPHA_1 (latency): Higher values penalize latency more. Range: 1-15
+  - ALPHA_2 (energy): Higher values penalize energy consumption more. Range: 0.1-5
+  - ALPHA_3 (fairness): Higher values reward fairness/service coverage more. Range: 1-10
+  - ALPHA_4 (offline_rate): Higher values penalize UEs going offline more. Range: 5-100 (related to WPT tuning)
+  
 - **(IMP)** MLP Structure : Change number of layers and units per layer, maybe try adding attention or other improvements. Can vary MLP_HIDDEN_DIM
 - **(IMP)** Learning Rates : Experiment with different learning rates for actor and critic networks (ACTOR_LR, CRITIC_LR)
 - **(IMP)** DISCOUNT_FACTOR and MAX_GRAD_NORM : Can vary their effect as well
 - **(IMP)** REPLAY_BUFFER_SIZE, REPLAY_BATCH_SIZE, INITIAL_RANDOM_STEPS, LEARN_FREQ : Tune these to improve learning stability and efficiency for off-policy algorithms
 - **(IMP)** MAPPO, MATD3, MASAC Specific Hyperparameters : Tune these hyperparameters specific to the chosen MARL algorithm for optimal performance
-- **(IMP)** ATTN_HIDDEN_DIM, ATTN_NUM_HEADS : Current values should work fine, but can try varying them.
+- **(IMP)** ATTN_HIDDEN_DIM, ATTN_NUM_HEADS : For attention-based models. ATTN_HIDDEN_DIM must be divisible by ATTN_NUM_HEADS. Current values (64 and 4) should work fine, but can try {32, 64, 128, 256} x {1, 2, 4, 8} combinations.
 
 **IMP NOTE**: Explore normalization of reward terms by different methods. Also take a final call on reward scaling and non-served latency penalty and include them in docs.

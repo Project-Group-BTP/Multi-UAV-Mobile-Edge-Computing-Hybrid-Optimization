@@ -34,7 +34,7 @@ class AttentionMADDPG(MARLModel):
                 actions.append(np.clip(action, -1.0, 1.0))
         return np.array(actions)
 
-    def update(self, batch: ExperienceBatch) -> None:
+    def update(self, batch: ExperienceBatch) -> dict:
         assert isinstance(batch, tuple) and len(batch) == 5, "MADDPG expects OffPolicyExperienceBatch (tuple of 5 elements)"
         obs_batch, actions_batch, rewards_batch, next_obs_batch, dones_batch = batch
         obs_tensor: torch.Tensor = torch.as_tensor(obs_batch, dtype=torch.float32, device=self.device)
@@ -44,6 +44,9 @@ class AttentionMADDPG(MARLModel):
         dones_tensor: torch.Tensor = torch.as_tensor(dones_batch, dtype=torch.float32, device=self.device)
         # CRITICAL CHANGE: We DO NOT flatten obs/actions here.
         # We keep them as (Batch, N, Dim) so the Attention Critic can read them.
+
+        agent_losses: list[float] = []
+        agent_critic_losses: list[float] = []
 
         for agent_idx in range(self.num_agents):
             # Update Critic
@@ -62,6 +65,7 @@ class AttentionMADDPG(MARLModel):
             critic_loss.backward()
             torch.nn.utils.clip_grad_norm_(self.critics[agent_idx].parameters(), config.MAX_GRAD_NORM)
             self.critic_optimizers[agent_idx].step()
+            agent_critic_losses.append(float(critic_loss.detach().item()))
 
             # Update Actor
             pred_actions_tensor: torch.Tensor = actions_tensor.clone()
@@ -72,12 +76,19 @@ class AttentionMADDPG(MARLModel):
             actor_loss.backward()
             torch.nn.utils.clip_grad_norm_(self.actors[agent_idx].parameters(), config.MAX_GRAD_NORM)
             self.actor_optimizers[agent_idx].step()
+            agent_losses.append(float(actor_loss.detach().item()))
 
             soft_update(self.target_actors[agent_idx], self.actors[agent_idx], config.UPDATE_FACTOR)
             soft_update(self.target_critics[agent_idx], self.critics[agent_idx], config.UPDATE_FACTOR)
 
         for n in self.noise:
             n.decay()
+
+        # Return averaged losses across all agents (same format as standard MADDPG)
+        return {
+            "actor": float(np.mean(agent_losses)),
+            "critic": float(np.mean(agent_critic_losses)),
+        }
 
     def _init_target_networks(self) -> None:
         for actor, target_actor in zip(self.actors, self.target_actors):

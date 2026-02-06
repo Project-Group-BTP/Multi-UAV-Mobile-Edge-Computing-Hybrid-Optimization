@@ -11,6 +11,7 @@ train_plots/
 test_plots/
 saved_models/
 tuning_logs/
+comparative_plots/
 *.png
 *.txt
 *.json

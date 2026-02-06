@@ -44,7 +44,7 @@ class AttentionMASAC(MARLModel):
                 actions.append(action.squeeze(0).cpu().numpy())
         return np.array(actions)
 
-    def update(self, batch: ExperienceBatch) -> None:
+    def update(self, batch: ExperienceBatch) -> dict:
         assert isinstance(batch, tuple) and len(batch) == 5, "MASAC expects OffPolicyExperienceBatch (tuple of 5 elements)"
         obs_batch, actions_batch, rewards_batch, next_obs_batch, dones_batch = batch
         obs_tensor = torch.as_tensor(obs_batch, dtype=torch.float32, device=self.device)
@@ -53,6 +53,10 @@ class AttentionMASAC(MARLModel):
         next_obs_tensor = torch.as_tensor(next_obs_batch, dtype=torch.float32, device=self.device)
         dones_tensor = torch.as_tensor(dones_batch, dtype=torch.float32, device=self.device)
         # CRITICAL CHANGE: We DO NOT flatten obs/actions here.
+
+        agent_actor_losses: list[float] = []
+        agent_critic_losses: list[float] = []
+        agent_alpha_losses: list[float] = []
 
         for agent_idx in range(self.num_agents):
             alpha: torch.Tensor = self.log_alphas[agent_idx].exp()
@@ -97,6 +101,9 @@ class AttentionMASAC(MARLModel):
             torch.nn.utils.clip_grad_norm_(self.critics_2[agent_idx].parameters(), config.MAX_GRAD_NORM)
             self.critic_2_optimizers[agent_idx].step()
 
+            avg_critic_loss = (float(critic_1_loss.detach().item()) + float(critic_2_loss.detach().item())) / 2.0
+            agent_critic_losses.append(avg_critic_loss)
+
             # Update Actor
             pred_actions_list: list[torch.Tensor] = []
             pred_log_probs_list: list[torch.Tensor] = []
@@ -117,15 +124,24 @@ class AttentionMASAC(MARLModel):
             actor_loss.backward()
             torch.nn.utils.clip_grad_norm_(self.actors[agent_idx].parameters(), config.MAX_GRAD_NORM)
             self.actor_optimizers[agent_idx].step()
+            agent_actor_losses.append(float(actor_loss.detach().item()))
 
             # Update Alpha
             alpha_loss: torch.Tensor = -(self.log_alphas[agent_idx] * (agent_log_prob + self.target_entropy).detach()).mean()
             self.alpha_optimizers[agent_idx].zero_grad()
             alpha_loss.backward()
             self.alpha_optimizers[agent_idx].step()
+            agent_alpha_losses.append(float(alpha_loss.detach().item()))
 
             soft_update(self.target_critics_1[agent_idx], self.critics_1[agent_idx], config.UPDATE_FACTOR)
             soft_update(self.target_critics_2[agent_idx], self.critics_2[agent_idx], config.UPDATE_FACTOR)
+
+        # Return averaged losses across all agents (same format as standard MASAC)
+        return {
+            "actor": float(np.mean(agent_actor_losses)),
+            "critic": float(np.mean(agent_critic_losses)),
+            "alpha": float(np.mean(agent_alpha_losses)),
+        }
 
     def _init_target_networks(self) -> None:
         for critic1, target_critic1 in zip(self.critics_1, self.target_critics_1):

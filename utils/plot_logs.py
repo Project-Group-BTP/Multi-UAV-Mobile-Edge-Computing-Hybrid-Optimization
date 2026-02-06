@@ -66,6 +66,7 @@ def generate_plots(log_file: str, output_dir: str, output_file_prefix: str, time
         "latency": [entry.get("latency") for entry in log_data],
         "energy": [entry.get("energy") for entry in log_data],
         "fairness": [entry.get("fairness") for entry in log_data],
+        "offline_rate": [entry.get("offline_rate") for entry in log_data],
         "actor_loss": [entry.get("actor_loss") for entry in log_data],
         "critic_loss": [entry.get("critic_loss") for entry in log_data],
         "entropy_loss": [entry.get("entropy_loss") for entry in log_data],
@@ -75,7 +76,7 @@ def generate_plots(log_file: str, output_dir: str, output_file_prefix: str, time
     x_data = parameters[x_axis_key]
 
     # Plot environment metrics
-    metrics_to_plot = ["reward", "latency", "energy", "fairness"]
+    metrics_to_plot = ["reward", "latency", "energy", "fairness", "offline_rate"]
     for metric in metrics_to_plot:
         if any(v is not None for v in parameters[metric]):
             y_data = [v if v is not None else np.nan for v in parameters[metric]]

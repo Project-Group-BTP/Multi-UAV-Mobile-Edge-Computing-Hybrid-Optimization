@@ -41,7 +41,7 @@ class AttentionMATD3(MARLModel):
                 actions.append(np.clip(action, -1.0, 1.0))
         return np.array(actions)
 
-    def update(self, batch: ExperienceBatch) -> None:
+    def update(self, batch: ExperienceBatch) -> dict:
         assert isinstance(batch, tuple) and len(batch) == 5, "MATD3 expects OffPolicyExperienceBatch (tuple of 5 elements)"
         self.update_counter += 1
         obs_batch, actions_batch, rewards_batch, next_obs_batch, dones_batch = batch
@@ -51,6 +51,9 @@ class AttentionMATD3(MARLModel):
         next_obs_tensor: torch.Tensor = torch.as_tensor(next_obs_batch, dtype=torch.float32, device=self.device)
         dones_tensor: torch.Tensor = torch.as_tensor(dones_batch, dtype=torch.float32, device=self.device)
         # CRITICAL CHANGE: We DO NOT flatten obs/actions here.
+
+        agent_losses: list[float] = []
+        agent_critic_losses: list[float] = []
 
         for agent_idx in range(self.num_agents):
             # Update Critic
@@ -87,6 +90,9 @@ class AttentionMATD3(MARLModel):
             torch.nn.utils.clip_grad_norm_(self.critics_2[agent_idx].parameters(), config.MAX_GRAD_NORM)
             self.critic_2_optimizers[agent_idx].step()
 
+            avg_critic_loss = (float(critic_1_loss.detach().item()) + float(critic_2_loss.detach().item())) / 2.0
+            agent_critic_losses.append(avg_critic_loss)
+
         # Delayed Policy and Target Network Updates
         if self.update_counter % config.POLICY_UPDATE_FREQ == 0:
             for agent_idx in range(self.num_agents):
@@ -99,6 +105,7 @@ class AttentionMATD3(MARLModel):
                 actor_loss.backward()
                 torch.nn.utils.clip_grad_norm_(self.actors[agent_idx].parameters(), config.MAX_GRAD_NORM)
                 self.actor_optimizers[agent_idx].step()
+                agent_losses.append(float(actor_loss.detach().item()))
 
                 # Soft update all target networks
                 soft_update(self.target_actors[agent_idx], self.actors[agent_idx], config.UPDATE_FACTOR)
@@ -107,6 +114,12 @@ class AttentionMATD3(MARLModel):
 
             for n in self.noise:
                 n.decay()
+
+        # Return averaged losses across all agents (same format as standard MATD3)
+        return {
+            "actor": float(np.mean(agent_losses)) if agent_losses else 0.0,
+            "critic": float(np.mean(agent_critic_losses)),
+        }
 
     def _init_target_networks(self) -> None:
         for actor, target_actor in zip(self.actors, self.target_actors):

@@ -76,6 +76,7 @@ class ComparativePlotter:
             "latency",
             "energy",
             "fairness",
+            "offline_rate",
             "actor_loss",
             "critic_loss",
             "entropy_loss",
@@ -194,7 +195,7 @@ class ComparativePlotter:
         os.makedirs(output_dir, exist_ok=True)
 
         # Define which metrics to plot
-        env_metrics = ["reward", "latency", "energy", "fairness"]
+        env_metrics = ["reward", "latency", "energy", "fairness", "offline_rate"]
         loss_metrics = ["actor_loss", "critic_loss", "entropy_loss", "alpha_loss"]
 
         all_metrics = env_metrics + loss_metrics
@@ -209,8 +210,8 @@ class ComparativePlotter:
         self._plot_summary(output_dir)
 
     def _plot_summary(self, output_dir: str) -> None:
-        """Create a 2x3 or 3x2 summary figure with key metrics."""
-        fig, axes = plt.subplots(2, 3, figsize=(18, 10))
+        """Create a 2x4 summary figure with key metrics."""
+        fig, axes = plt.subplots(2, 4, figsize=(22, 10))
         axes = axes.flatten()
 
         summary_metrics = [
@@ -218,8 +219,10 @@ class ComparativePlotter:
             "latency",
             "energy",
             "fairness",
+            "offline_rate",
             "actor_loss",
             "critic_loss",
+            "alpha_loss",
         ]
 
         for ax_idx, metric in enumerate(summary_metrics):

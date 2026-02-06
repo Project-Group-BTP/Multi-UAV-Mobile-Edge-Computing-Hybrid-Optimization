@@ -39,7 +39,7 @@ class AttentionMAPPO(MARLModel):
         clipped_actions: np.ndarray = np.clip(actions.cpu().numpy(), -1.0, 1.0)
         return (clipped_actions, log_probs.cpu().numpy(), values.cpu().numpy())
 
-    def update(self, batch: ExperienceBatch) -> None:
+    def update(self, batch: ExperienceBatch) -> dict:
         """Expects a batch from AttentionRolloutBuffer: (Batch_Size, Num_Agents, Dim)"""
         assert isinstance(batch, dict), "MAPPO expects OnPolicyExperienceBatch (dict)"
         obs_batch: torch.Tensor = batch["obs"]
@@ -88,6 +88,13 @@ class AttentionMAPPO(MARLModel):
         critic_loss.backward()
         torch.nn.utils.clip_grad_norm_(self.critic.parameters(), config.MAX_GRAD_NORM)
         self.critic_optimizer.step()
+
+        # Return losses for logging (same format as standard MAPPO)
+        return {
+            "actor": float(actor_loss.detach().item()),
+            "critic": float(critic_loss.detach().item()),
+            "entropy": float(entropy.detach().item()),
+        }
 
     def reset(self) -> None:
         pass
