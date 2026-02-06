@@ -10,13 +10,26 @@ import torch
 import numpy as np
 import argparse
 import warnings
+import os
 from datetime import datetime
 
 
 def start_training(args: argparse.Namespace):
     timestamp: str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     print(f"\n🚀 Training started at {timestamp} for {args.num_episodes} episodes\n")
-    logger: Logger = Logger("train_logs", timestamp)
+
+    np.random.seed(config.SEED)
+    torch.manual_seed(config.SEED)
+    env: Env = Env()
+    model_name: str = config.MODEL.lower()
+    model: MARLModel = get_model(model_name)
+
+    # Setup logging directory
+    model_log_dir = f"train_logs/{model_name}"
+    if not os.path.exists(model_log_dir):
+        os.makedirs(model_log_dir)
+
+    logger: Logger = Logger(model_log_dir, timestamp)
     resume_training: bool = args.resume_path is not None
     if resume_training:
         if args.config_path is None:
@@ -27,12 +40,6 @@ def start_training(args: argparse.Namespace):
         if args.config_path is not None:
             warnings.warn("--config_path is ignored during training unless --resume_path is also provided.")
         logger.log_configs()
-
-    np.random.seed(config.SEED)
-    torch.manual_seed(config.SEED)
-    env: Env = Env()
-    model_name: str = config.MODEL.lower()
-    model: MARLModel = get_model(model_name)
 
     total_step_count: int = 0  # for off policy models
     if resume_training:
@@ -50,19 +57,28 @@ def start_training(args: argparse.Namespace):
 
     print("✅ Training Completed!\n")
     print("📊 Generating plots...")
-    generate_plots(f"train_logs/log_data_{timestamp}.json", "train_plots/", "train", timestamp)
+
+    model_plot_dir = f"train_plots/{model_name}"
+    generate_plots(f"{model_log_dir}/log_data_{timestamp}.json", f"{model_plot_dir}/", "train", timestamp)
 
 
 def start_testing(args: argparse.Namespace):
     timestamp: str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     print(f"\n🚀 Testing started at {timestamp} for {args.num_episodes} episodes\n")
-    logger: Logger = Logger("test_logs", timestamp)
-    logger.load_configs(args.config_path)
 
     np.random.seed(config.SEED)
     torch.manual_seed(config.SEED)
     env: Env = Env()
-    model: MARLModel = get_model(config.MODEL.lower())
+    model_name: str = config.MODEL.lower()
+    model: MARLModel = get_model(model_name)
+
+    # Setup logging directory
+    model_log_dir = f"test_logs/{model_name}"
+    if not os.path.exists(model_log_dir):
+        os.makedirs(model_log_dir)
+
+    logger: Logger = Logger(model_log_dir, timestamp)
+    logger.load_configs(args.config_path)
 
     model.load(args.model_path)
     print(f"📥 Models loaded successfully from {args.model_path}")
@@ -71,7 +87,7 @@ def start_testing(args: argparse.Namespace):
 
     print("✅ Testing Completed!\n")
     print("📊 Generating plots...")
-    generate_plots(f"test_logs/log_data_{timestamp}.json", "test_plots/", "test", timestamp)
+    generate_plots(f"test_logs/log_data_{timestamp}.json", "test_plots/", "test", timestamp, smoothing_window=2)
 
 
 if __name__ == "__main__":

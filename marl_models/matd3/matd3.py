@@ -49,8 +49,8 @@ class MATD3(MARLModel):
 
         return np.array(actions)
 
-    def update(self, batch: ExperienceBatch) -> None:
-        assert isinstance(batch, tuple) and len(batch) == 5, "MATD3 expects OffPolicyExperienceBatch (tuple of 5 elements)"
+    def update(self, batch: ExperienceBatch) -> dict:
+        assert (isinstance(batch, tuple) and len(batch) == 5), "MATD3 expects OffPolicyExperienceBatch (tuple of 5 elements)"
         self.update_counter += 1
         obs_batch, actions_batch, rewards_batch, next_obs_batch, dones_batch = batch
         obs_tensor: torch.Tensor = torch.as_tensor(obs_batch, dtype=torch.float32, device=self.device)
@@ -64,29 +64,29 @@ class MATD3(MARLModel):
         next_obs_flat: torch.Tensor = next_obs_tensor.reshape(batch_size, -1)
         actions_flat: torch.Tensor = actions_tensor.reshape(batch_size, -1)
 
+        agent_critic_losses_1: list[float] = []
+        agent_critic_losses_2: list[float] = []
+        agent_losses: list[float] = []
+
         for agent_idx in range(self.num_agents):
             # Update Critic
             with torch.no_grad():
-                # Get next actions from target actors and add clipped noise
                 next_actions: list[torch.Tensor] = []
                 for i in range(self.num_agents):
                     next_action_i: torch.Tensor = self.target_actors[i](next_obs_tensor[:, i, :])
-                    noise: torch.Tensor = torch.randn_like(next_action_i) * config.TARGET_POLICY_NOISE
+                    noise: torch.Tensor = (torch.randn_like(next_action_i) * config.TARGET_POLICY_NOISE)
                     clipped_noise: torch.Tensor = torch.clamp(noise, -config.NOISE_CLIP, config.NOISE_CLIP)
                     next_actions.append(torch.clamp(next_action_i + clipped_noise, -1.0, 1.0))
 
                 next_actions_tensor: torch.Tensor = torch.cat(next_actions, dim=1)
-
-                # Compute target Q-value using the minimum of the two target critics
                 target_q1: torch.Tensor = self.target_critics_1[agent_idx](next_obs_flat, next_actions_tensor)
                 target_q2: torch.Tensor = self.target_critics_2[agent_idx](next_obs_flat, next_actions_tensor)
                 target_q_min: torch.Tensor = torch.min(target_q1, target_q2)
 
                 agent_reward: torch.Tensor = rewards_tensor[:, agent_idx].unsqueeze(1)
                 agent_done: torch.Tensor = dones_tensor[:, agent_idx].unsqueeze(1)
-                y: torch.Tensor = agent_reward + config.DISCOUNT_FACTOR * target_q_min * (1 - agent_done)
+                y: torch.Tensor = (agent_reward + config.DISCOUNT_FACTOR * target_q_min * (1 - agent_done))
 
-            # Update both critic networks
             current_q1: torch.Tensor = self.critics_1[agent_idx](obs_flat, actions_flat)
             current_q2: torch.Tensor = self.critics_2[agent_idx](obs_flat, actions_flat)
             critic_1_loss: torch.Tensor = F.mse_loss(current_q1, y)
@@ -96,11 +96,13 @@ class MATD3(MARLModel):
             critic_1_loss.backward()
             torch.nn.utils.clip_grad_norm_(self.critics_1[agent_idx].parameters(), config.MAX_GRAD_NORM)
             self.critic_1_optimizers[agent_idx].step()
+            agent_critic_losses_1.append(float(critic_1_loss.detach().item()))
 
             self.critic_2_optimizers[agent_idx].zero_grad()
             critic_2_loss.backward()
             torch.nn.utils.clip_grad_norm_(self.critics_2[agent_idx].parameters(), config.MAX_GRAD_NORM)
             self.critic_2_optimizers[agent_idx].step()
+            agent_critic_losses_2.append(float(critic_2_loss.detach().item()))
 
         # Delayed Policy and Target Network Updates
         if self.update_counter % config.POLICY_UPDATE_FREQ == 0:
@@ -116,6 +118,7 @@ class MATD3(MARLModel):
                 actor_loss.backward()
                 torch.nn.utils.clip_grad_norm_(self.actors[agent_idx].parameters(), config.MAX_GRAD_NORM)
                 self.actor_optimizers[agent_idx].step()
+                agent_losses.append(float(actor_loss.detach().item()))
 
                 # Soft update all target networks
                 soft_update(self.target_actors[agent_idx], self.actors[agent_idx], config.UPDATE_FACTOR)
@@ -124,6 +127,13 @@ class MATD3(MARLModel):
 
             for n in self.noise:
                 n.decay()
+
+        # Return averaged losses across all agents
+        avg_critic_loss = float(np.mean(agent_critic_losses_1 + agent_critic_losses_2))
+        return {
+            "actor": float(np.mean(agent_losses)) if agent_losses else None,
+            "critic": avg_critic_loss,
+        }
 
     def _init_target_networks(self) -> None:
         for actor, target_actor in zip(self.actors, self.target_actors):

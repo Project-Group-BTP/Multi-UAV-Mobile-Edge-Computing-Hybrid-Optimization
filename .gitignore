@@ -10,6 +10,7 @@ test_logs/
 train_plots/
 test_plots/
 saved_models/
-# *.png
-# *.txt
-# *.json
+tuning_logs/
+*.png
+*.txt
+*.json

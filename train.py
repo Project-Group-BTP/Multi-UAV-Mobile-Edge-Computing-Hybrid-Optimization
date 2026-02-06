@@ -10,9 +10,10 @@ import config
 import torch
 import numpy as np
 import time
+import optuna
 
 
-def train_on_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: int) -> None:
+def train_on_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: int, trial: optuna.Trial | None = None) -> float:
     start_time: float = time.time()
     BufferClass: type[RolloutBuffer] = AttentionRolloutBuffer if "attention" in model.model_name.lower() else RolloutBuffer
     buffer: RolloutBuffer = BufferClass(num_agents=config.NUM_UAVS, obs_dim=config.OBS_DIM_SINGLE, action_dim=config.ACTION_DIM, buffer_size=config.PPO_ROLLOUT_LENGTH, device=model.device)
@@ -23,6 +24,8 @@ def train_on_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: in
     if num_episodes < 1000:
         save_freq = 100
     rollout_log: Log = Log()
+    accumulated_losses: dict = {"actor": [], "critic": [], "entropy": []}
+    recent_rewards: list[float] = [] # Tracking metrics for tuning
 
     for update in range(1, num_updates + 1):
         obs: list[np.ndarray] = env.reset()
@@ -57,6 +60,15 @@ def train_on_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: in
             rollout_fairness = jfi
             rollout_offline_rate = offline_rate
 
+        # Optuna Pruning Check
+        recent_rewards.append(rollout_reward)
+        if trial:
+            # Report average of last 5 updates to smooth out noise
+            current_avg_reward: float = float(np.mean(recent_rewards[-5:] if len(recent_rewards) >= 5 else recent_rewards))
+            trial.report(current_avg_reward, update)
+            if trial.should_prune():
+                raise optuna.TrialPruned()
+
         with torch.no_grad():
             _, _, last_values = model.get_action_and_value(np.array(obs), state)
 
@@ -64,27 +76,46 @@ def train_on_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: in
 
         for _ in range(config.PPO_EPOCHS):
             for batch in buffer.get_batches(config.PPO_BATCH_SIZE):
-                model.update(batch)
+                loss_dict = model.update(batch)
+                if loss_dict:
+                    accumulated_losses["actor"].append(loss_dict.get("actor"))
+                    accumulated_losses["critic"].append(loss_dict.get("critic"))
+                    accumulated_losses["entropy"].append(loss_dict.get("entropy"))
 
         buffer.clear()
 
         rollout_log.append(rollout_reward, rollout_latency, rollout_energy, rollout_fairness, rollout_offline_rate)
         if update % config.LOG_FREQ == 0:
             elapsed_time: float = time.time() - start_time
-            logger.log_metrics(update, rollout_log, config.LOG_FREQ, elapsed_time, "update")
+            # Prepare averaged losses for logging
+            avg_losses: dict | None = None
+            if accumulated_losses["actor"]:
+                avg_losses = {
+                    "actor": float(np.mean([x for x in accumulated_losses["actor"] if x is not None])),
+                    "critic": float(np.mean([x for x in accumulated_losses["critic"] if x is not None])),
+                    "entropy": float(np.mean([x for x in accumulated_losses["entropy"] if x is not None])),
+                }
+            logger.log_metrics(update, rollout_log, config.LOG_FREQ, elapsed_time, "update", losses=avg_losses)
+            # Reset accumulated losses for next logging interval
+            accumulated_losses = {"actor": [], "critic": [], "entropy": []}
         if update % save_freq == 0 and update < num_episodes:
             save_models(model, update, "update", logger.timestamp)
 
     save_models(model, -1, "update", logger.timestamp, final=True)
 
+    # Return average reward of last 10% of training for optimization score
+    return float(np.mean(recent_rewards[-int(num_updates * 0.1):]))
 
-def train_off_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: int, total_step_count: int) -> None:
+
+def train_off_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: int, total_step_count: int, trial: optuna.Trial | None = None) -> float:
     start_time: float = time.time()
     buffer: ReplayBuffer = ReplayBuffer(config.REPLAY_BUFFER_SIZE)
     save_freq: int = num_episodes // 10
     if num_episodes < 1000:
         save_freq = 100
     episode_log: Log = Log()
+    accumulated_losses: dict = {"actor": [], "critic": [], "alpha": []}
+    recent_rewards: list[float] = []  # Tracking metrics for tuning
 
     for episode in range(1, num_episodes + 1):
         obs = env.reset()
@@ -114,7 +145,11 @@ def train_off_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: i
 
             if total_step_count > config.INITIAL_RANDOM_STEPS and step % config.LEARN_FREQ == 0 and len(buffer) > config.REPLAY_BATCH_SIZE:
                 batch = buffer.sample(config.REPLAY_BATCH_SIZE)
-                model.update(batch)
+                loss_dict = model.update(batch)
+                if loss_dict:
+                    accumulated_losses["actor"].append(loss_dict.get("actor"))
+                    accumulated_losses["critic"].append(loss_dict.get("critic"))
+                    accumulated_losses["alpha"].append(loss_dict.get("alpha"))
 
             obs = next_obs
 
@@ -129,14 +164,42 @@ def train_off_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: i
         episode_log.append(episode_reward, episode_latency, episode_energy, episode_fairness, episode_offline_rate)
         if episode % config.LOG_FREQ == 0:
             elapsed_time: float = time.time() - start_time
-            logger.log_metrics(episode, episode_log, config.LOG_FREQ, elapsed_time, "episode")
+            # Prepare averaged losses for logging
+            avg_losses: dict | None = None
+            if accumulated_losses["actor"]:
+                avg_losses = {
+                    "actor": float(np.mean([x for x in accumulated_losses["actor"] if x is not None])),
+                    "critic": float(np.mean([x for x in accumulated_losses["critic"] if x is not None])),
+                    "alpha": float(np.mean([x for x in accumulated_losses["alpha"] if x is not None])),
+                }
+            logger.log_metrics(
+                episode,
+                episode_log,
+                config.LOG_FREQ,
+                elapsed_time,
+                "episode",
+                losses=avg_losses,
+            )
+            # Reset accumulated losses for next logging interval
+            accumulated_losses = {"actor": [], "critic": [], "alpha": []}
         if episode % save_freq == 0 and episode < num_episodes:
             save_models(model, episode, "episode", logger.timestamp, total_steps=total_step_count)
+        
+        recent_rewards.append(episode_reward)
+        if trial:
+            # Report average of last 10 episodes
+            current_avg_reward: float = float(np.mean(recent_rewards[-10:] if len(recent_rewards) >= 10 else recent_rewards))
+            trial.report(current_avg_reward, episode)
+            if trial.should_prune():
+                raise optuna.TrialPruned()
 
     save_models(model, -1, "episode", logger.timestamp, final=True, total_steps=total_step_count)
 
+    # Return average reward of last 10% of training for optimization score
+    return float(np.mean(recent_rewards[-int(num_episodes * 0.1):]))
 
-def train_random(env: Env, model: MARLModel, logger: Logger, num_episodes: int) -> None:
+
+def train_random(env: Env, model: MARLModel, logger: Logger, num_episodes: int) -> float:
     start_time: float = time.time()
     episode_log: Log = Log()
 
@@ -171,4 +234,6 @@ def train_random(env: Env, model: MARLModel, logger: Logger, num_episodes: int) 
         episode_log.append(episode_reward, episode_latency, episode_energy, episode_fairness, episode_offline_rate)
         if episode % config.LOG_FREQ == 0:
             elapsed_time: float = time.time() - start_time
-            logger.log_metrics(episode, episode_log, config.LOG_FREQ, elapsed_time, "episode")
+            logger.log_metrics(episode, episode_log, config.LOG_FREQ, elapsed_time, "episode", losses=None)
+
+    return 0.0  # Random training does not need tuning

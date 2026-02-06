@@ -9,7 +9,14 @@ import os
 
 
 class MADDPG(MARLModel):
-    def __init__(self, model_name: str, num_agents: int, obs_dim: int, action_dim: int, device: str) -> None:
+    def __init__(
+        self,
+        model_name: str,
+        num_agents: int,
+        obs_dim: int,
+        action_dim: int,
+        device: str,
+    ) -> None:
         super().__init__(model_name, num_agents, obs_dim, action_dim, device)
         self.total_obs_dim: int = num_agents * obs_dim
         self.total_action_dim: int = num_agents * action_dim
@@ -42,8 +49,8 @@ class MADDPG(MARLModel):
 
         return np.array(actions)
 
-    def update(self, batch: ExperienceBatch) -> None:
-        assert isinstance(batch, tuple) and len(batch) == 5, "MADDPG expects OffPolicyExperienceBatch (tuple of 5 elements)"
+    def update(self, batch: ExperienceBatch) -> dict:
+        assert (isinstance(batch, tuple) and len(batch) == 5), "MADDPG expects OffPolicyExperienceBatch (tuple of 5 elements)"
         obs_batch, actions_batch, rewards_batch, next_obs_batch, dones_batch = batch
         obs_tensor: torch.Tensor = torch.as_tensor(obs_batch, dtype=torch.float32, device=self.device)
         actions_tensor: torch.Tensor = torch.as_tensor(actions_batch, dtype=torch.float32, device=self.device)
@@ -56,6 +63,9 @@ class MADDPG(MARLModel):
         next_obs_flat: torch.Tensor = next_obs_tensor.reshape(batch_size, -1)
         actions_flat: torch.Tensor = actions_tensor.reshape(batch_size, -1)
 
+        agent_losses: list[float] = []
+        agent_critic_losses: list[float] = []
+
         for agent_idx in range(self.num_agents):
             # Update Critic
             with torch.no_grad():
@@ -67,30 +77,36 @@ class MADDPG(MARLModel):
                 y: torch.Tensor = agent_reward + config.DISCOUNT_FACTOR * target_q_value * (1 - agent_done)
 
             current_q_value: torch.Tensor = self.critics[agent_idx](obs_flat, actions_flat)
-
             critic_loss: torch.Tensor = F.mse_loss(current_q_value, y)
             self.critic_optimizers[agent_idx].zero_grad()
             critic_loss.backward()
             torch.nn.utils.clip_grad_norm_(self.critics[agent_idx].parameters(), config.MAX_GRAD_NORM)
             self.critic_optimizers[agent_idx].step()
+            agent_critic_losses.append(float(critic_loss.detach().item()))
 
             # Update Actor
             pred_actions_tensor: torch.Tensor = actions_tensor.detach().clone()
             pred_actions_tensor[:, agent_idx, :] = self.actors[agent_idx](obs_tensor[:, agent_idx, :])
             pred_actions_flat: torch.Tensor = pred_actions_tensor.reshape(batch_size, -1)
-
             actor_loss: torch.Tensor = -self.critics[agent_idx](obs_flat, pred_actions_flat).mean()
             self.actor_optimizers[agent_idx].zero_grad()
             actor_loss.backward()
             torch.nn.utils.clip_grad_norm_(self.actors[agent_idx].parameters(), config.MAX_GRAD_NORM)
             self.actor_optimizers[agent_idx].step()
+            agent_losses.append(float(actor_loss.detach().item()))
 
             # Soft update target networks
             soft_update(self.target_actors[agent_idx], self.actors[agent_idx], config.UPDATE_FACTOR)
-            soft_update(self.target_critics[agent_idx], self.critics[agent_idx], config.UPDATE_FACTOR)
+            soft_update(self.target_critics[agent_idx], self.critics[agent_idx], config.UPDATE_FACTOR,)
 
         for n in self.noise:
             n.decay()
+
+        # Return averaged losses across all agents
+        return {
+            "actor": float(np.mean(agent_losses)),
+            "critic": float(np.mean(agent_critic_losses)),
+        }
 
     def _init_target_networks(self) -> None:
         for actor, target_actor in zip(self.actors, self.target_actors):
