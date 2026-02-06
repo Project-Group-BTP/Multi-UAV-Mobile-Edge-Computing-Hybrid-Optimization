@@ -114,7 +114,11 @@ def train_off_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: i
     if num_episodes < 1000:
         save_freq = 100
     episode_log: Log = Log()
-    accumulated_losses: dict = {"actor": [], "critic": [], "alpha": []}
+    # Only track alpha loss for SAC-based algorithms
+    has_alpha = "sac" in model.model_name.lower()
+    accumulated_losses: dict = {"actor": [], "critic": []}
+    if has_alpha:
+        accumulated_losses["alpha"] = []
     recent_rewards: list[float] = []  # Tracking metrics for tuning
 
     for episode in range(1, num_episodes + 1):
@@ -149,7 +153,8 @@ def train_off_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: i
                 if loss_dict:
                     accumulated_losses["actor"].append(loss_dict.get("actor"))
                     accumulated_losses["critic"].append(loss_dict.get("critic"))
-                    accumulated_losses["alpha"].append(loss_dict.get("alpha"))
+                    if has_alpha and "alpha" in loss_dict:
+                        accumulated_losses["alpha"].append(loss_dict.get("alpha"))
 
             obs = next_obs
 
@@ -170,8 +175,9 @@ def train_off_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: i
                 avg_losses = {
                     "actor": float(np.mean([x for x in accumulated_losses["actor"] if x is not None])),
                     "critic": float(np.mean([x for x in accumulated_losses["critic"] if x is not None])),
-                    "alpha": float(np.mean([x for x in accumulated_losses["alpha"] if x is not None])),
                 }
+                if has_alpha and accumulated_losses["alpha"]:
+                    avg_losses["alpha"] = float(np.mean([x for x in accumulated_losses["alpha"] if x is not None]))
             logger.log_metrics(
                 episode,
                 episode_log,
@@ -181,7 +187,9 @@ def train_off_policy(env: Env, model: MARLModel, logger: Logger, num_episodes: i
                 losses=avg_losses,
             )
             # Reset accumulated losses for next logging interval
-            accumulated_losses = {"actor": [], "critic": [], "alpha": []}
+            accumulated_losses = {"actor": [], "critic": []}
+            if has_alpha:
+                accumulated_losses["alpha"] = []
         if episode % save_freq == 0 and episode < num_episodes:
             save_models(model, episode, "episode", logger.timestamp, total_steps=total_step_count)
         

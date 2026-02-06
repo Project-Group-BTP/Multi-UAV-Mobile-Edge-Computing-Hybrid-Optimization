@@ -10,7 +10,12 @@ class Log:
         self.latencies: list[float] = []
         self.energies: list[float] = []
         self.fairness_scores: list[float] = []
-        self.offline_rates: list[float] = []   
+        self.offline_rates: list[float] = []
+        # Training losses (optional, may be empty for random baseline)
+        self.actor_losses: list[float | None] = []
+        self.critic_losses: list[float | None] = []
+        self.entropy_losses: list[float | None] = []
+        self.alpha_losses: list[float | None] = []
 
     def append(
         self,
@@ -29,12 +34,6 @@ class Log:
 
         Parameters are averaged/aggregated externally by training loop before being passed here.
         """
-        # Training losses (optional, may be empty for random baseline)
-        self.actor_losses: list[float | None] = []
-        self.critic_losses: list[float | None] = []
-        self.entropy_losses: list[float | None] = []
-        self.alpha_losses: list[float | None] = []
-        
         self.rewards.append(reward)
         self.latencies.append(latency)
         self.energies.append(energy)

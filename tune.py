@@ -92,8 +92,10 @@ def run_tuning(args):
         pruner=pruner,
     )
 
-    func = lambda trial: objective(trial, args.stage, config.MODEL.lower(), args.episodes)
-    study.optimize(func, n_trials=args.trials)
+    def objective_wrapper(trial):
+        return objective(trial, args.stage, config.MODEL.lower(), args.episodes)
+
+    study.optimize(objective_wrapper, n_trials=args.trials)
 
     print("\n🏆 Tuning Completed!")
     print(f"Best Trial Score: {study.best_value}")
