@@ -84,12 +84,15 @@ venv\Scripts\activate  # Windows
 
 # Install dependencies
 pip install -r requirements.txt
+
+# Install dependencies (with GPU enable PyTorch version)
+pip install -r requirements.txt --index-url https://download.pytorch.org/whl/cu126
 ```
 
 ### 2. Train Your First Model
 ```bash
 # Train MADDPG for 1000 episodes
-python train.py --model maddpg --episodes 1000
+python train.py --num_episodes 1000
 
 # Watch training progress in console
 # Results saved to train_logs/maddpg/

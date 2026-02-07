@@ -54,19 +54,6 @@ marl_models/
 
 ## 🔧 How to Use
 
-### Train with Specific Algorithm
-
-```python
-# Method 1: Command line
-python train.py --model maddpg --episodes 5000
-
-# Method 2: In Python
-from train import train_agent
-config = get_config()
-config.MODEL = "attention_maddpg"
-train_agent(config)
-```
-
 ### Switch Between Algorithms
 
 Simply change `MODEL` in [config.py](../config.py):
@@ -89,28 +76,25 @@ MODEL = "random"              # Random baseline
 ### Stage 1: Reward Optimization
 No algorithm-specific tuning, just reward weights:
 ```bash
-python tune.py --stage 1 --model maddpg --episodes 500 --trials 50
+python tune.py --stage 1 --episodes 500 --trials 50
 ```
 
 ### Stage 2: Algorithm Hyperparameters
 Tunes learning rates, network size, batch size, discount factor:
 ```bash
-python tune.py --stage 2 --model maddpg --episodes 1000 --trials 50
+python tune.py --stage 2 --episodes 1000 --trials 50
 ```
 
 ### Stage 3: Attention Architecture (Attention Models Only)
 Optimize attention dimension and heads:
 ```bash
-python tune.py --stage 3 --model attention_maddpg --episodes 500 --trials 30
+python tune.py --stage 3 --episodes 500 --trials 30
 ```
 
 ## 🔍 Comparing Algorithms
 
 ```bash
-# Train multiple algorithms
-python train.py --model maddpg --episodes 5000
-python train.py --model masac --episodes 5000
-python train.py --model attention_maddpg --episodes 5000
+# Train using multiple algorithms by changing model in configs.py
 
 # Compare results
 python utils/comparative_plots.py \
