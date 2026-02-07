@@ -197,7 +197,8 @@ def plot_tuning_results(study: optuna.Study, model_name: str, stage: int) -> Non
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Hyperparameter Tuning Module",
-        epilog="""Examples:
+        epilog="""
+Examples:
   Stage 1 (Objective tuning):
     python tune.py --stage 1 --episodes 500 --trials 50
     
@@ -206,7 +207,8 @@ if __name__ == "__main__":
     
   Stage 3 (Attention architecture tuning - attention models only):
     python tune.py --stage 3 --episodes 500 --trials 30
-        """
+        """,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
         "--stage",
